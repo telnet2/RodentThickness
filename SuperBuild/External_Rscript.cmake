@@ -43,9 +43,7 @@ if(NOT DEFINED ${extProjName}_DIR AND NOT ${USE_SYSTEM_${extProjName}})
     #    URL ""
       #  URL_MD5 )
   else()
-    set(Rscript_DOWNLOAD_ARGS
-        URL "http://cran.cict.fr/src/base/R-2/R-2.15.3.tar.gz"
-	URL_MD5 b2f1a5d701f1f90679be0c60e1931a5c)
+    set(Rscript_DOWNLOAD_ARGS URL "http://cran.cnr.berkeley.edu/src/base/R-2/R-2.15.3.tar.gz" URL_MD5 b2f1a5d701f1f90679be0c60e1931a5c)
   endif()
 message("[] end download Rscript...")
 

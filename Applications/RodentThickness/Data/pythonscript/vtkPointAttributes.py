@@ -64,7 +64,6 @@ def main(opts, argv):
 
   print "# points:", nPoints
   for j in range(1,nPoints):
-    print j
     first = csvreader.next()
     for k in range(0,nCols):
       data[j,k] = float(first[k])

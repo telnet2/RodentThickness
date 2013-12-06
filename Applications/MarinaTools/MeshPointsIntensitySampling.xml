@@ -19,6 +19,14 @@
       <description>Over-write distance vector for sampling projection</description>
     </boolean>
     <boolean>
+      <name>smoothScalars</name>
+      <label>Smooth scalar values</label>
+      <channel>input</channel>
+      <flag>s</flag>
+      <longflag>smoothScalars</longflag>
+      <default>false</default>
+    </boolean>
+    <boolean>
       <name>thresholdDistanceVector</name>
       <label>Threshold Distance Vector Flag</label>
       <channel>input</channel>
@@ -77,12 +85,28 @@
       <channel>input</channel>
     </file>
     <file>
-      <name>meshOutput</name>
-      <description>Mesh output with actual sampling points</description>
-      <label>Mesh Output</label>
+      <name>smoothAttrFileName</name>
+      <description>Attribute file name</description>
+      <label>Attribute file name</label>
+      <default>smooth_attribute.txt</default>
+      <longflag>smoothedAttributeOutput</longflag>
+      <channel>input</channel>
+    </file>
+    <file>
+      <name>originalMeshOutput</name>
+      <description>the original mesh with sampled attributes and its smoothed values</description>
+      <label>Original Mesh Output</label>
       <default>mesh.sampling.vtk</default>
+      <longflag>originalMeshOutput</longflag>
+      <channel>output</channel>
+    </file>
+    <file>
+      <name>modifiedMeshOutput</name>
+      <description>Mesh output with actual sampling points</description>
+      <label>Modified Mesh Output</label>
+      <default>mesh.output.vtk</default>
       <flag>m</flag>
-      <longflag>meshOutput</longflag>
+      <longflag>modifiedMeshOutput</longflag>
       <channel>output</channel>
     </file>
     <file>
@@ -101,6 +125,11 @@
 			<name>inputAsPhysicalCoord</name>
 			<longflag>inputAsPhysicalCoord</longflag>
 			<description>Points of the input mesh is index-based coordinate (use if SPHARM input is given)</description>
+		</boolean>
+		<boolean>
+			<name>inputPointFlip</name>
+			<longflag>inputPointFlip</longflag>
+			<description>Points of the input mesh is flipped with respect to XY plane</description>
 		</boolean>
   </parameters>
 </executable>

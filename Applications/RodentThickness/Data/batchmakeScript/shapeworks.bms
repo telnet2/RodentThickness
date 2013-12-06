@@ -1,31 +1,38 @@
-MakeDirectory(${WorkDir}/Processing/2.shapeworks)
-Set(OutDirectoryshapeworks ${WorkDir}/Processing/2.shapeworks)
+#MakeDirectory(${WorkDir}/Processing/2.shapeworks)
+#Set(OutDirectoryshapeworks ${WorkDir}/Processing/2.shapeworks)
 
-Set(OutDirectoryMeasurementandSPHARM ${WorkDir}/Processing/1.MeasurementandSPHARM)
+#Set(OutDirectoryMeasurementandSPHARM ${WorkDir}/Processing/1.MeasurementandSPHARM)
 
-WriteFile (${OutDirectoryshapeworks}/inputimage.txt '')
-WriteFile (${OutDirectoryshapeworks}/inputsurfacemodels.txt '')
-WriteFile (${OutDirectoryshapeworks}/outputCorrespondence.txt '')
-WriteFile (${OutDirectoryshapeworks}/outputWarped.txt  '')
-WriteFile (${WorkDir}/outputdataset.csv '')
-ForEach (subj ${subjects})
-	
-					AppendFile (${OutDirectoryshapeworks}/inputsurfacemodels.txt ${OutDirectoryMeasurementandSPHARM}/${subj}.ip.SPHARM.vtk\n)
-					AppendFile (${OutDirectoryshapeworks}/outputCorrespondence.txt ${OutDirectoryshapeworks}/${subj}.correspondence.vtk\n)
-					AppendFile (${OutDirectoryshapeworks}/outputWarped.txt ${OutDirectoryshapeworks}/${subj}.warped.vtk\n)
-					AppendFile (${OutDirectoryshapeworks}/inputimage.txt ${OutDirectoryMeasurementandSPHARM}/${subj}.labelMapNCsegmentationSegPostProcess.nrrd\n)
-					
-				
+#WriteFile (${OutDirectoryshapeworks}/inputimage.txt '')
+#WriteFile (${OutDirectoryshapeworks}/inputsurfacemodels.txt '')
+#WriteFile (${OutDirectoryshapeworks}/outputCorrespondence.txt '')
+#WriteFile (${OutDirectoryshapeworks}/outputWarped.txt  '')
+#WriteFile (${WorkDir}/outputdataset.csv '')
+#ForEach (subj ${subjects})
+#	
+#					AppendFile (${OutDirectoryshapeworks}/inputsurfacemodels.txt ${OutDirectoryMeasurementandSPHARM}/${subj}.ip.SPHARM.vtk\n)
+#					AppendFile (${OutDirectoryshapeworks}/outputCorrespondence.txt ${OutDirectoryshapeworks}/${subj}.correspondence.vtk\n)
+#					AppendFile (${OutDirectoryshapeworks}/outputWarped.txt ${OutDirectoryshapeworks}/${subj}.warped.vtk\n)
+#					AppendFile (${OutDirectoryshapeworks}/inputimage.txt ${OutDirectoryMeasurementandSPHARM}/${subj}.labelMapNCsegmentationSegPostProcess.nrrd\n)
+#					
+#				
+#
+#EndForEach (${subj})
+#
+#
+#
+#Set (cmdline ${PythonPath} ${ShapeWorksPythonScriptPath} ${OutDirectoryshapeworks}/inputimage.txt ${OutDirectoryshapeworks}/inputsurfacemodels.txt -c ${OutDirectoryshapeworks}/outputCorrespondence.txt -w ${OutDirectoryshapeworks}/outputWarped.txt --workingDir ${OutDirectoryshapeworks} --pathShapeWorksRun ${ShapeWorksRunPath} --pathShapeWorksGroom ${ShapeWorksGroomPath} --pathImageMath ${ImageMathPath} --pathBinaryToDistanceMap ${BinaryToDistanceMapPath})
+#Run (output ${cmdline})
+#
+#
+#
+#WriteFile (${WorkDir}/outputdataset.csv group,subjId,labelMapInput,measurementoutput,surfacemodels,correspondenceMesh,ThicknessSamplingResults,labelCortex,labelBrain,labelOutside\n)
 
-EndForEach (${subj})
+GetFilename(ScriptDir ${ShapeWorksPythonScriptPath} PATH)
 
-
-
-Set (cmdline ${PythonPath} ${ShapeWorksPythonScriptPath} ${OutDirectoryshapeworks}/inputimage.txt ${OutDirectoryshapeworks}/inputsurfacemodels.txt -c ${OutDirectoryshapeworks}/outputCorrespondence.txt -w ${OutDirectoryshapeworks}/outputWarped.txt --workingDir ${OutDirectoryshapeworks} --pathShapeWorksRun ${ShapeWorksRunPath} --pathShapeWorksGroom ${ShapeWorksGroomPath} --pathImageMath ${ImageMathPath} --pathBinaryToDistanceMap ${BinaryToDistanceMapPath})
+#Set (cmdline ${PythonPath} ${ScriptDir}/run.py --computeThickness --precorrespondence --runcorrespondence --runstat ${WorkDir}/dataset.csv ${WorkDir}/RodentThicknessConfigfile.bms ${WorkDir})
+Set (cmdline ${PythonPath} ${ScriptDir}/run.py --precorrespondence --runstat ${WorkDir}/dataset.csv ${WorkDir}/RodentThicknessConfigfile.bms ${WorkDir})
+#Set (cmdline ${PythonPath} ${ScriptDir}/run.py  --runstat ${WorkDir}/dataset.csv ${WorkDir}/RodentThicknessConfigfile.bms ${WorkDir})
+#Echo (${cmdline})
 Run (output ${cmdline})
-
-
-
-WriteFile (${WorkDir}/outputdataset.csv group,subjId,labelMapInput,measurementoutput,surfacemodels,correspondenceMesh,ThicknessSamplingResults,labelCortex,labelBrain,labelOutside\n)
-
 

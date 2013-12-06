@@ -2,7 +2,7 @@
 # Script to compute population thickness difference
 #
 # Rscript rodentThicknessStats.r work-dir control-data treatment-data
-options(warn=1)
+options(warn=-1)
 cmdArgs = commandArgs(TRUE);
 ctlFile = cmdArgs[1]; 
 expFile = cmdArgs[2];
@@ -12,32 +12,36 @@ secondgroup = cmdArgs[5];
 cl <- data.matrix(read.csv(file=ctlFile, sep="\t", header=FALSE));
 fl <- data.matrix(read.csv(file=expFile, sep="\t", header=FALSE));
 
-cl = cl[,1:(ncol(cl)-1)];
-fl = fl[,1:(ncol(fl)-1)];
+# remove the trailing delimiter
+#cl = cl[,1:(ncol(cl)-1)];
+#fl = fl[,1:(ncol(fl)-1)];
+
+cl = cl[,1:(ncol(cl))];
+fl = fl[,1:(ncol(fl))];
+
+alldata = cbind(cl,fl);
+clCols = 1:ncol(cl);
+flCols = (ncol(cl)+1):(ncol(fl) + ncol(cl));
 
 #########################################################
 # compute each group's row-wise (point-wise) mean
-clCols = 1:ncol(cl);
-flCols = 1:ncol(fl) + ncol(cl);
-
 print("Start t-test")
-alldata = cbind(cl,fl);
 alltest = apply(alldata,1,function(x) t.test(x[clCols],x[flCols]));
+
+pvalues = sapply(alltest, function(x) x$p.value);
+tscores = sapply(alltest, function(x) x$statistic);
+adjpvalues = p.adjust(pvalues, method='fdr');
+
+clMeans = sapply(alltest, function(x) x$estimate[1]);
+flMeans = sapply(alltest, function(x) x$estimate[2]);
 
 print("Start wilcox-test")
 ranktest = apply(alldata,1,function(x) wilcox.test(x[clCols],x[flCols]));
 
-pvalues = sapply(alltest, function(x) x$p.value);
-tscores = sapply(alltest, function(x) x$statistic);
-
-adjpvalues = p.adjust(pvalues, method='fdr');
-
-wscores = sapply(ranktest, function(x) x$statistic);
 wpvalues = sapply(ranktest, function(x) x$p.value);
+wscores = sapply(ranktest, function(x) x$statistic);
 wadjpvalues = p.adjust(wpvalues, method='fdr');
 
-clMeans = sapply(alltest, function(x) x$estimate[1]);
-flMeans = sapply(alltest, function(x) x$estimate[2]);
 
 flStd = apply(fl,1,sd);
 clStd = apply(cl,1,sd);
@@ -45,11 +49,11 @@ clStd = apply(cl,1,sd);
 meanDiff = clMeans - flMeans;
 stdDiff  = clStd - flStd;
 
-name1 = paste(c(firstgroup, "CtrlMean"), collapse = "_") ;
-name2 = paste(c(secondgroup, "ExprMean"), collapse = "_") ;
+name1 = paste(c(firstgroup, "Mean"), collapse = "_") ;
+name2 = paste(c(secondgroup, "Mean"), collapse = "_") ;
 name3 = paste(c(name1, name2), collapse = "-") ;
-name4 = paste(c(firstgroup, "CtrlSd"), collapse = "_") ;
-name5 = paste(c(secondgroup, "ExprSd"), collapse = "_") ;
+name4 = paste(c(firstgroup, "Sd"), collapse = "_") ;
+name5 = paste(c(secondgroup, "Sd"), collapse = "_") ;
 # manual t-test computation
 #ttest = (clMean-flMean)/(clStd^2/ncol(cl)+flStd^2/ncol(fl))^0.5;
 #pvalues = pt(ttest, ncol(cl)+ncol(fl)-2);

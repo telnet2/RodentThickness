@@ -1,10 +1,13 @@
 import sys
-import os
+import os,re
 from optparse import OptionParser
 from vtk import vtkPolyDataReader, vtkPolyDataWriter, vtkThinPlateSplineTransform, vtkGeneralTransform, vtkTransformPolyDataFilter
 
 imageMathPath = " "
 shapeWorksRun = " "
+shapeWorksGroom = " "
+imageStatPath = " "
+binary2distanceMap = " "
 
 def warp(srcLandmark,dstLandmark,subj):
   tps = vtkThinPlateSplineTransform()
@@ -43,10 +46,10 @@ def vtk2lpts(inputImages,inputSurfaces, outputPoints):
     points = mesh.GetPoints()
     fo = open(fout, "w")
     print "Converting %s into %s [%d points] ..." % (fin, fout, points.GetNumberOfPoints())
+    pixsize=voxelSize(fim)
+    print pixsize
     for i in range(0, points.GetNumberOfPoints()):
       p = points.GetPoint(i)
-      pixsize=voxelSize(fim)
-      print pixsize
       fo.write("%f %f %f\n" % (-1.25/pixsize[0]*p[0],-1.25/pixsize[1]*p[1],1.25/pixsize[2]*p[2]))
     fo.close()
 
@@ -117,7 +120,7 @@ def groom(imagesIn,imagesOut):
   execute("%s %s isolate hole_fill antialias fastmarching blur" % (shapeWorksGroom, "groom.xml"))
 
 def voxelSize(inputImage):
-  pstat = os.popen("%s %s -info" % ( "ImageStat", inputImage))
+  pstat = os.popen("%s %s -info" % ( imageStatPath, inputImage))
   lines = pstat.read()
   pstat.close()
   pixdims = [ i for i in lines.split("\n") if i.startswith("Pixdims") ]
@@ -147,8 +150,8 @@ def run(shapeWorksCmd,inputImages,inputPoints):
 
 def executePreProcessing(opts, args, inputImages, preprocessedImages):
   for (imgIn, imgOut) in zip(inputImages, preprocessedImages):
-    execute("%s %s -type short -changeSp 1.25,1.25,1.25 -outfile %s" % (opts.pathImageMath, imgIn, imgOut))
-    execute("%s --binaryInput %s --smoothing 1.25 --output %s" % (opts.pathBinaryToDistanceMap, imgOut, imgOut))
+    execute("%s %s -type short -changeSp 1.25,1.25,1.25 -outfile %s" % (imageMathPath, imgIn, imgOut))
+    execute("%s --binaryInput %s --smoothing 1.25 --output %s" % (binary2distanceMap, imgOut, imgOut))
 
 def executePostProcessing(opts, args, inputSurfaces,inputImages):
   if (opts.correspondingOutputList == ""):
@@ -171,12 +174,6 @@ def executePostProcessing(opts, args, inputSurfaces,inputImages):
     tpsWarp(inputSurfaces[0],outputSurfaces,inputSurfaces[0],warpedSurfaces)
 
 def main(opts, args):
-  # toolPath = opts.pathShapeWorks
-  #shapeWorksRun = "%s/ShapeWorksRun" % (toolPath)
-  #shapeWorksGroom = "%s/ShapeWorksGroom" % (toolPath)
-  shapeWorksRun = opts.pathShapeWorksRun
-  shapeWorksGroom =opts.pathShapeWorksGroom
-  imageMathPath = opts.pathImageMath
   inputImages = file2string(args[0])
   inputSurfaces = file2string(args[1])
   if (len(inputImages) != len(inputSurfaces)):
@@ -206,22 +203,38 @@ def correctPoints(opts, args):
   f.write(lins)
   f.close()
 
+def initializeConfig(bmsfile):
+  config = {}
+  reg = re.compile("[ ]*[Ss][Ee][Tt][ ]*\([ ]*([A-Za-z0-9_]*)[ ]+(.*)\)")
+  with open(bmsfile) as f:
+    bmslines = f.readlines()
+  for line in bmslines:
+    bmsmatch = reg.match(line)
+    name = bmsmatch.group(1)
+    path = bmsmatch.group(2).strip()
+    config.update({name:path})
+  return config
+
 
 if (__name__ =="__main__"):
   parser = OptionParser(usage="%prog [options] images_input surfaces_input")
   parser.add_option("--workingDir", dest="workingDirectory", help="change working directory where intermediate files such as parameters.xml and output.*.lpts are created.", default="")
   parser.add_option("-w", "--warpedOutputList", help="text file containing the list of warped output", dest="warpedOutputList", default="")
   parser.add_option("-c", "--correspondingOutputList", help="text file containing the list of corresponding surfaces", dest="correspondingOutputList", default="")
-  parser.add_option("--pathShapeWorksRun", help="tool path for shape Works",dest="pathShapeWorksRun", default="/NIRAL/tools/bin_linux64/ShapeWorksRun")
-  parser.add_option("--pathShapeWorksGroom", help="tool path for shape Works",dest="pathShapeWorksGroom", default="/NIRAL/tools/bin_linux64/ShapeWorksGroom")
-  parser.add_option("--pathImageMath", help="path for ImageMath", dest="pathImageMath", default="/NIRAL/tools/bin_linux64/")
-  parser.add_option("--pathBinaryToDistanceMap", help="path for BinaryToDistanceMap", dest="pathBinaryToDistanceMap", default="/tools/bin_linux64/BinaryToDistanceMap")
+  parser.add_option("--configbms", help="executable path config file", dest="pathConfigBMS", default="RodentThicknessConfigfile.bms")
   parser.add_option("--fixpoints", help="fix points by flipping x,y against the origin (adding minus", action="store_true", dest="isFixingPoint")
   parser.add_option("--nopreprocessing", action="store_true", help="do not create distance map", dest="isNoPreProcessing")
   parser.add_option("--noshapeworks", action="store_true", help="do not run ShapeWorks", dest="isNoShapeWorks")
   parser.add_option("--notps", action="store_true", help="do not run TPS warping", dest="isNoTPS")
 
   (opts, args) = parser.parse_args()
+  config = initializeConfig(opts.pathConfigBMS)
+
+  imageMathPath = config["ImageMathPath"]
+  imageStatPath = config["ImageStatPath"]
+  shapeWorksRun = config["ShapeWorksRunPath"]
+  shapeWorksGroom = config["ShapeWorksGroomPath"]
+  binary2distanceMap = config["BinaryToDistanceMapPath"]
 
   if (opts.workingDirectory != ""):
     os.chdir(opts.workingDirectory)

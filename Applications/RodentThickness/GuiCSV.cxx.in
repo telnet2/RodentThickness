@@ -110,6 +110,8 @@ QObject::connect(PythonPath, SIGNAL(editingFinished()), this, SLOT(testpythonver
 
 	QObject::connect(measureThicknessFilterButton, SIGNAL(clicked()), SoftButtonMapper, SLOT(map()));
 	SoftButtonMapper->setMapping(measureThicknessFilterButton,1);
+	QObject::connect(ResampleVolume2Button, SIGNAL(clicked()), SoftButtonMapper, SLOT(map()));
+	SoftButtonMapper->setMapping(ResampleVolume2Button,18);
 	QObject::connect(GenParaMeshCLPButton, SIGNAL(clicked()), SoftButtonMapper, SLOT(map()));
 	SoftButtonMapper->setMapping(GenParaMeshCLPButton,2);
 	QObject::connect(ParaToSPHARMMeshCLPButton, SIGNAL(clicked()), SoftButtonMapper, SLOT(map()));
@@ -120,6 +122,8 @@ QObject::connect(PythonPath, SIGNAL(editingFinished()), this, SLOT(testpythonver
 	SoftButtonMapper->setMapping(ShapeWorksRunButton,5);
 	QObject::connect(ImageMathButton, SIGNAL(clicked()), SoftButtonMapper, SLOT(map()));
 	SoftButtonMapper->setMapping(ImageMathButton,6);
+	QObject::connect(ImageStatButton, SIGNAL(clicked()), SoftButtonMapper, SLOT(map()));
+	SoftButtonMapper->setMapping(ImageStatButton,17);
 	QObject::connect(SegPostprocessButton, SIGNAL(clicked()), SoftButtonMapper, SLOT(map()));
 	SoftButtonMapper->setMapping(SegPostprocessButton,7);
 	QObject::connect(ShapeWorksPythonScriptButton, SIGNAL(clicked()), SoftButtonMapper, SLOT(map()));
@@ -146,6 +150,8 @@ QObject::connect(PythonPath, SIGNAL(editingFinished()), this, SLOT(testpythonver
 
 	QObject::connect(measureThicknessFilterResetButton, SIGNAL(clicked()), ResetSoftButtonMapper, SLOT(map()));
 	ResetSoftButtonMapper->setMapping(measureThicknessFilterResetButton,1);
+	QObject::connect(ResampleVolume2ResetButton, SIGNAL(clicked()), ResetSoftButtonMapper, SLOT(map()));
+	ResetSoftButtonMapper->setMapping(ResampleVolume2ResetButton,18);
 	QObject::connect(GenParaMeshResetCLPButton, SIGNAL(clicked()), ResetSoftButtonMapper, SLOT(map()));
 	ResetSoftButtonMapper->setMapping(GenParaMeshResetCLPButton,2);
 	QObject::connect(ParaToSPHARMMeshCLPResetButton, SIGNAL(clicked()), ResetSoftButtonMapper, SLOT(map()));
@@ -156,6 +162,8 @@ QObject::connect(PythonPath, SIGNAL(editingFinished()), this, SLOT(testpythonver
 	ResetSoftButtonMapper->setMapping(ShapeWorksRunResetButton,5);
 	QObject::connect(ImageMathResetButton, SIGNAL(clicked()), ResetSoftButtonMapper, SLOT(map()));
 	ResetSoftButtonMapper->setMapping(ImageMathResetButton,6);
+	QObject::connect(ImageStatResetButton, SIGNAL(clicked()), ResetSoftButtonMapper, SLOT(map()));
+	ResetSoftButtonMapper->setMapping(ImageStatResetButton,17);
 	QObject::connect(SegPostprocessResetButton, SIGNAL(clicked()), ResetSoftButtonMapper, SLOT(map()));
 	ResetSoftButtonMapper->setMapping(SegPostprocessResetButton,7);
 	QObject::connect(PythonPathResetButton, SIGNAL(clicked()), ResetSoftButtonMapper, SLOT(map()));
@@ -321,11 +329,13 @@ if( configfile.empty() )
 
 	std::string notFound;
 	if(measureThicknessFilterPath->text().isEmpty()) notFound = notFound + "> measureThicknessFilter\n";
+	if(ResampleVolume2Path->text().isEmpty()) notFound = notFound + "> ResampleVolume2Path\n";
 	if(GenParaMeshCLPPath->text().isEmpty()) notFound = notFound + "> GenParaMeshCLP\n";
 	if(ParaToSPHARMMeshCLPPath->text().isEmpty()) notFound = notFound + "> ParaToSPHARMMeshCLP\n";
 	if(MeshPointIntensitySamplingPath->text().isEmpty()) notFound = notFound + "> MeshPointIntensitySampling\n";
 	if(ShapeWorksRunPath->text().isEmpty()) notFound = notFound + "> ShapeWorksRun\n";
 	if(ImageMathPath->text().isEmpty()) notFound = notFound + "> ImageMath\n";
+	if(ImageStatPath->text().isEmpty()) notFound = notFound + "> ImageStat\n";
 	if(SegPostprocessPath->text().isEmpty()) notFound = notFound + "> SegPostprocessCLP\n";
 	if(ShapeWorksPythonScriptPath->text().isEmpty()) notFound = notFound + "> shapeworks.py\n";
 	if(PythonPath->text().isEmpty()) notFound = notFound + "> python\n";
@@ -594,6 +604,27 @@ int GuiCSV::LoadConfig(QString configFile) // returns -1 if fails, otherwise 0
 			if(!list.at(1).isEmpty()) measureThicknessFilterPath->setText(list.at(1));
 			else if(measureThicknessFilterPath->text().isEmpty()) notFound = notFound + "> measureThicknessFilter\n";	
 
+      // ResampleVolume2
+			line = stream.readLine();
+			n=line.size();
+			line.remove(n-1,1);
+			list = line.split(" ");
+			if(!list.at(0).contains(QString("Set(ResampleVolume2Path")))
+			{
+				if(!m_noGUI)
+				{
+					QMessageBox::critical(this, "Corrupt File", "This config file is corrupted");
+					std::cout<<"FAILED"<<std::endl; // command line display
+				}
+				else std::cout<<"FAILED"<<std::endl<<"| This config file is corrupted"<<std::endl;
+				return -1;
+				
+			}
+			if(!list.at(1).isEmpty()) ResampleVolume2Path->setText(list.at(1));
+			else if(ResampleVolume2Path->text().isEmpty()) notFound = notFound + "> ResampleVolume2\n";
+      // ResampleVolume2
+
+      // GenParaMesh
 			line = stream.readLine();
 			n=line.size();
 			line.remove(n-1,1);
@@ -611,6 +642,7 @@ int GuiCSV::LoadConfig(QString configFile) // returns -1 if fails, otherwise 0
 			}
 			if(!list.at(1).isEmpty()) GenParaMeshCLPPath->setText(list.at(1));
 			else if(GenParaMeshCLPPath->text().isEmpty()) notFound = notFound + "> GenParaMeshCLP\n";
+      // GenParaMesh
 
 			line = stream.readLine();
 			n=line.size();
@@ -684,6 +716,7 @@ int GuiCSV::LoadConfig(QString configFile) // returns -1 if fails, otherwise 0
 			if(!list.at(1).isEmpty()) ShapeWorksGroomPath->setText(list.at(1));
 			else if(ShapeWorksGroomPath->text().isEmpty()) notFound = notFound + "> ShapeWorksGroom\n";
 
+      // ImageMath
 			line = stream.readLine();
 			n=line.size();
 			line.remove(n-1,1);
@@ -701,6 +734,27 @@ int GuiCSV::LoadConfig(QString configFile) // returns -1 if fails, otherwise 0
 			}
 			if(!list.at(1).isEmpty()) ImageMathPath->setText(list.at(1));
 			else if(ImageMathPath->text().isEmpty()) notFound = notFound + "> ImageMath\n";
+      // ImageMath 
+
+      // ImageStat
+			line = stream.readLine();
+			n=line.size();
+			line.remove(n-1,1);
+			list = line.split(" ");
+			if(!list.at(0).contains(QString("Set(ImageStatPath")))
+			{
+				if(!m_noGUI)
+				{
+					QMessageBox::critical(this, "Corrupt File", "This config file is corrupted");
+					std::cout<<"FAILED"<<std::endl; // command line display
+				}
+				else std::cout<<"FAILED"<<std::endl<<"| This config file is corrupted"<<std::endl;
+				return -1;
+				
+			}
+			if(!list.at(1).isEmpty()) ImageStatPath->setText(list.at(1));
+			else if(ImageStatPath->text().isEmpty()) notFound = notFound + "> ImageStat\n";
+      // ImageStat
 
 			line = stream.readLine();
 			n=line.size();
@@ -892,12 +946,14 @@ void GuiCSV::SaveConfig(QString ConfigBrowseName) /*SLOT*/
 
 			//save all the path of the different tools in a batchmake script
 			stream << "Set(measureThicknessFilterPath " << measureThicknessFilterPath->text() <<")"<< endl;
+			stream << "Set(ResampleVolume2Path " << ResampleVolume2Path->text() <<")"<< endl;
 			stream << "Set(GenParaMeshCLPPath " << GenParaMeshCLPPath->text() <<")"<< endl;
 			stream << "Set(ParaToSPHARMMeshCLPPath " << ParaToSPHARMMeshCLPPath->text() <<")"<< endl;
 			stream << "Set(MeshPointIntensitySamplingPath " << MeshPointIntensitySamplingPath->text() <<")"<< endl;
 			stream << "Set(ShapeWorksRunPath " << ShapeWorksRunPath->text() <<")"<< endl;
 			stream << "Set(ShapeWorksGroomPath " << ShapeWorksGroomPath->text() <<")"<< endl;
 			stream << "Set(ImageMathPath " << ImageMathPath->text() <<")"<< endl;
+			stream << "Set(ImageStatPath " << ImageStatPath->text() <<")"<< endl;
 			stream << "Set(SegPostprocessPath " << SegPostprocessPath->text() <<")"<< endl;
 			stream << "Set(ShapeWorksPythonScriptPath " << ShapeWorksPythonScriptPath->text() <<")"<< endl;
 			stream << "Set(PythonPath " << PythonPath->text() <<")"<< endl;
@@ -944,6 +1000,11 @@ std::cout<<"| Searching the softwares..."; // command line display
 	if(program.empty()) { if(measureThicknessFilterPath->text().isEmpty()) notFound = notFound + "> measureThicknessFilter\n"; }
 	else measureThicknessFilterPath->setText(QString(program.c_str()));
 
+	program = itksys::SystemTools::FindProgram("ResampleVolume2",m_FindProgramRTExecDirVec,1);
+	if(program.empty()) { program = itksys::SystemTools::FindProgram("ResampleVolume2",m_FindProgramRTExecDirVec); }
+	if(program.empty()) { if(ResampleVolume2Path->text().isEmpty()) notFound = notFound + "> ResampleVolume2\n"; }
+	else ResampleVolume2Path->setText(QString(program.c_str()));
+
 	program = itksys::SystemTools::FindProgram("GenParaMeshCLP",m_FindProgramRTExecDirVec,1);
 	if(program.empty()) { program = itksys::SystemTools::FindProgram("GenParaMeshCLP",m_FindProgramRTExecDirVec); }
 	if(program.empty()) { if(GenParaMeshCLPPath->text().isEmpty()) notFound = notFound + "> GenParaMeshCLP\n"; }
@@ -974,6 +1035,11 @@ std::cout<<"| Searching the softwares..."; // command line display
 	if(program.empty()) { if(ImageMathPath->text().isEmpty()) notFound = notFound + "> ImageMath\n"; }
 	else ImageMathPath->setText(QString(program.c_str()));
 	
+	program = itksys::SystemTools::FindProgram("ImageStat",m_FindProgramRTExecDirVec,1);
+	if(program.empty()) { program = itksys::SystemTools::FindProgram("ImageStat",m_FindProgramRTExecDirVec); }
+	if(program.empty()) { if(ImageStatPath->text().isEmpty()) notFound = notFound + "> ImageStat\n"; }
+	else ImageStatPath->setText(QString(program.c_str()));
+
 	program = itksys::SystemTools::FindProgram("SegPostProcessCLP",m_FindProgramRTExecDirVec,1);
 	if(program.empty()) { program = itksys::SystemTools::FindProgram("SegPostProcessCLP",m_FindProgramRTExecDirVec); }
 	if(program.empty()) { if(SegPostprocessPath->text().isEmpty()) notFound = notFound + "> SegPostProcessCLP\n"; }
@@ -1020,7 +1086,7 @@ std::cout<<"| Searching the softwares..."; // command line display
 	
 }
 
-void GuiCSV::BrowseSoft(int soft)  /*SLOT*/  //softwares: 1=measureThicknessFilter, 2=GenParaMeshCLP, 3=ParaToSPHARMMeshCLP, 4=MeshPointIntensitySampling, 5=ShapeWorksRun, 6=ImageMath, 7=SegPostprocess,13=Python, 14= Rscript 16=BinaryToDistanceMap 
+void GuiCSV::BrowseSoft(int soft)  /*SLOT*/  //softwares: 1=measureThicknessFilter, 2=GenParaMeshCLP, 3=ParaToSPHARMMeshCLP, 4=MeshPointIntensitySampling, 5=ShapeWorksRun, 6=ImageMath, 7=SegPostprocess,13=Python, 14= Rscript 15=BinaryToDistanceMap 17=ImageMath, 18=ResampleVolume2
 {											
 	QString SoftBrowse;
 	
@@ -1066,6 +1132,10 @@ void GuiCSV::BrowseSoft(int soft)  /*SLOT*/  //softwares: 1=measureThicknessFilt
 			break;
 		case 16: BinaryToDistanceMapPath->setText(SoftBrowse);
 			break;
+    case 17: ImageStatPath->setText(SoftBrowse);
+      break;
+    case 18: ResampleVolume2Path->setText(SoftBrowse);
+      break;
 		}
 	}
 }
@@ -1106,6 +1176,10 @@ void GuiCSV::ResetSoft(int softindex) /*SLOT*/ //softwares:
 		break;
 	case 15:soft="rodentthickness.r";
 		break;
+	case 17:soft="ImageStat";
+		break;
+	case 18:soft="ResampleVolume2";
+		break;
 	}
 
 	std::cout<<"| Searching the software \'"<< soft <<"\'..."; // command line display
@@ -1136,6 +1210,8 @@ void GuiCSV::ResetSoft(int softindex) /*SLOT*/ //softwares:
 		else if(softindex==13) concatToColumnsPythonScriptPath->setText(QString(program.c_str()));
 		else if(softindex==14) vtkPointAttributesPythonScriptPath->setText(QString(program.c_str()));
 		else if(softindex==15) RScriptRodentThicknessPath->setText(QString(program.c_str()));
+		else if(softindex==17) ImageStatPath->setText(QString(program.c_str()));
+		else if(softindex==18) ResampleVolume2Path->setText(QString(program.c_str()));
 		
 	}
 
@@ -1165,7 +1241,7 @@ void GuiCSV::ReadMe() /*SLOT*/ /////to UPDATE
 QDialog *dlg = new QDialog(this);
 dlg->setWindowTitle ("Read Me");
 
-std::string info = "RodentThickness\n===============\n\nA tool to measure cortical thickness of rodent brain\n\nThese Softwares need to be installed before executing the tool :\n- ImageMath\n- measureThicknessFilter\n- GenParaMeshCLP\n- ParaToSPHARMMeshCLP\n- ShapeWorksRun\n- ShapeWorksGroom\n- SegPostProcessCLP\n- BinaryToDistanceMap\n- MeshPointsIntensitysampling\n\nThe program use : \n- python2.6 or python2.7 with vtk installed\n- Rscript\n\n For any question, suggestion or remark, please contact mjacquem@unc.edu";
+std::string info = "RodentThickness\n===============\n\nA tool to measure cortical thickness of rodent brain\n\nThese Softwares need to be installed before executing the tool :\n- ImageMath\n- ImageStat\n- measureThicknessFilter\n- ResampleVolume2\n- GenParaMeshCLP\n- ParaToSPHARMMeshCLP\n- ShapeWorksRun\n- ShapeWorksGroom\n- SegPostProcessCLP\n- BinaryToDistanceMap\n- MeshPointsIntensitysampling\n\nThe program use : \n- python2.6 or python2.7 with vtk installed\n- Rscript\n\n For any question, suggestion or remark, please contact mjacquem@unc.edu";
 QLabel *InfoLabel = new QLabel (info.c_str(), this);
 QVBoxLayout *VLayout = new QVBoxLayout();
 VLayout->addWidget(InfoLabel);
@@ -1565,7 +1641,7 @@ int GuiCSV::LaunchScriptWriter()
 	if(ExitCode!=0) return -1;
 /* Software paths */
 /* Checking if all the programs have been given */
-	if(measureThicknessFilterPath->text().isEmpty() || GenParaMeshCLPPath->text().isEmpty() || ParaToSPHARMMeshCLPPath->text().isEmpty() || MeshPointIntensitySamplingPath->text().isEmpty() || ShapeWorksRunPath->text().isEmpty() || ShapeWorksGroomPath->text().isEmpty() || ImageMathPath->text().isEmpty() || SegPostprocessPath->text().isEmpty() || ShapeWorksPythonScriptPath->text().isEmpty() || concatToColumnsPythonScriptPath->text().isEmpty() || vtkPointAttributesPythonScriptPath->text().isEmpty()|| PythonPath->text().isEmpty()|| RScriptPath->text().isEmpty()|| RScriptRodentThicknessPath->text().isEmpty()|| BinaryToDistanceMapPath->text().isEmpty()) // if any path is missing => check in the config file and in the PATH
+	if(measureThicknessFilterPath->text().isEmpty() || ResampleVolume2Path->text().isEmpty() || GenParaMeshCLPPath->text().isEmpty() || ParaToSPHARMMeshCLPPath->text().isEmpty() || MeshPointIntensitySamplingPath->text().isEmpty() || ShapeWorksRunPath->text().isEmpty() || ShapeWorksGroomPath->text().isEmpty() || ImageMathPath->text().isEmpty() || ImageStatPath->text().isEmpty() || SegPostprocessPath->text().isEmpty() || ShapeWorksPythonScriptPath->text().isEmpty() || concatToColumnsPythonScriptPath->text().isEmpty() || vtkPointAttributesPythonScriptPath->text().isEmpty()|| PythonPath->text().isEmpty()|| RScriptPath->text().isEmpty()|| RScriptRodentThicknessPath->text().isEmpty()|| BinaryToDistanceMapPath->text().isEmpty()) // if any path is missing => check in the config file and in the PATH
 	{
 
 		std::string programPath;
@@ -1576,6 +1652,12 @@ int GuiCSV::LaunchScriptWriter()
 			programPath = itksys::SystemTools::FindProgram("measureThicknessFilter",m_FindProgramRTExecDirVec);
 			if(programPath.empty()) notFound = notFound + "> measureThicknessFilter\n";
 			else measureThicknessFilterPath->setText(QString(programPath.c_str()));
+		}
+		if(ResampleVolume2Path->text().isEmpty())
+		{
+			programPath = itksys::SystemTools::FindProgram("ResampleVolume2",m_FindProgramRTExecDirVec);
+			if(programPath.empty()) notFound = notFound + "> ResampleVolume2\n";
+			else ResampleVolume2Path->setText(QString(programPath.c_str()));
 		}
 		if(GenParaMeshCLPPath->text().isEmpty())
 		{
@@ -1612,6 +1694,12 @@ int GuiCSV::LaunchScriptWriter()
 			programPath = itksys::SystemTools::FindProgram("ImageMath",m_FindProgramRTExecDirVec);
 			if(programPath.empty()) notFound = notFound + "> ImageMath\n";
 			else ImageMathPath->setText(QString(programPath.c_str()));
+		}
+		if(ImageStatPath->text().isEmpty())
+		{
+			programPath = itksys::SystemTools::FindProgram("ImageStat",m_FindProgramRTExecDirVec);
+			if(programPath.empty()) notFound = notFound + "> ImageStat\n";
+			else ImageStatPath->setText(QString(programPath.c_str()));
 		}
 		if(SegPostprocessPath->text().isEmpty())
 		{
@@ -1678,6 +1766,12 @@ int GuiCSV::LaunchScriptWriter()
 			QMessageBox::critical(this, "Non executable File", QString(text.c_str()) );
 			return -1;
 	}
+	if(! itksys::SystemTools::GetPermissions(ResampleVolume2Path->text().toStdString().c_str(), ITKmode_X_OK) )
+	{
+			std::string text = "The file \'" + ResampleVolume2Path->text().toStdString() + "\' is not executable";
+			QMessageBox::critical(this, "Non executable File", QString(text.c_str()) );
+			return -1;
+	}
 	if(! itksys::SystemTools::GetPermissions(GenParaMeshCLPPath->text().toStdString().c_str(), ITKmode_X_OK) )
 	{
 			std::string text = "The file \'" + GenParaMeshCLPPath->text().toStdString() + "\' is not executable";
@@ -1714,6 +1808,13 @@ int GuiCSV::LaunchScriptWriter()
 			QMessageBox::critical(this, "Non executable File", QString(text.c_str()) );
 			return -1;
 	}
+	if(! itksys::SystemTools::GetPermissions(ImageStatPath->text().toStdString().c_str(), ITKmode_X_OK) )
+	{
+			std::string text = "The file \'" + ImageStatPath->text().toStdString() + "\' is not executable";
+			QMessageBox::critical(this, "Non executable File", QString(text.c_str()) );
+			return -1;
+	}
+
 	if(! itksys::SystemTools::GetPermissions(SegPostprocessPath->text().toStdString().c_str(), ITKmode_X_OK) )
 	{
 			std::string text = "The file \'" + SegPostprocessPath->text().toStdString() + "\' is not executable";

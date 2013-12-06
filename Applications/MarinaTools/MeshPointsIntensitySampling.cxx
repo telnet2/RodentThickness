@@ -30,6 +30,14 @@
 #include "vtkDoubleArray.h"
 
 #include <iostream>
+#include "vtkio.h"
+#include <vtkPolyData.h>
+#include <vtkPointData.h>
+#include <vtkIdList.h>
+#include <vtkFloatArray.h>
+#include <vtkMath.h>
+
+#include <vnl/vnl_vector.h>
 
 typedef itk::DefaultDynamicMeshTraits<double,3,3,double,double> MeshTraitsType;
 typedef itk::Mesh<double,3,MeshTraitsType> MeshType;
@@ -51,6 +59,7 @@ typedef itk::SignedDanielssonDistanceMapImageFilter<BinaryImageType,ImageType> D
 
 static bool _overwriteDistanceVector = false;
 static bool _inputAsPhysicalCoord = false;
+static bool _inputPointFlip = false;
 
 class VectorMagnitudeSquareFunctor {
   public:
@@ -113,7 +122,129 @@ namespace {
     cout << "done" << endl;
   }
 
-  int extraction(string image, string mesh, string intp, string dstv, double lowThreshold, string attrfileName, string meshOutput) {
+
+
+void runSmoothScalars(vtkPolyData* poly, string attrOutput, double sigma, int nIters) {
+    vtkMath* math = vtkMath::New();
+
+    // sigma for smoothing
+    double sigma2 = sigma;
+    sigma2 *= sigma2;
+
+    // number of iterations
+    int numIters = nIters;
+
+    // access data
+    string scalarName = "sample";
+    vtkDataArray* scalars = poly->GetPointData()->GetScalars(scalarName.c_str());
+    if (scalars == NULL) {
+        cout << "can't find scalars: " << scalarName << endl;
+        return;
+    }
+
+    // copy the scalars to iteratively apply smoothing
+    vtkFloatArray* data = vtkFloatArray::New();
+    data->DeepCopy(scalars);
+
+    // prepare new data array
+    vtkFloatArray* newData = vtkFloatArray::New();
+
+    string outputScalarName = "smooth_sample";
+    newData->SetName(outputScalarName.c_str());
+    newData->SetNumberOfTuples(data->GetNumberOfTuples());
+    poly->GetPointData()->AddArray(newData);
+
+
+    // check if the scalar array exists
+    if (data == NULL) {
+        cout << "can't access scalar array: " << scalarName << endl;
+        return;
+    }
+
+    // iterate over all points
+    vtkIdList* cellIds = vtkIdList::New();
+    vtkIdList* ptIds = vtkIdList::New();
+    std::set<int> ptSet;
+
+    // build cells
+    poly->BuildCells();
+    poly->BuildLinks();
+
+    for (int n = 0; n < numIters; n++) {
+        for (int i = 0; i < poly->GetNumberOfPoints(); i++) {
+            double center[3];
+            poly->GetPoint(i, center);
+
+            // collect neighbor cells
+            ptSet.clear();
+
+            cellIds->Reset();
+            poly->GetPointCells(i, cellIds);
+
+            // iterate over neighbor cells
+            for (int j = 0; j < cellIds->GetNumberOfIds(); j++) {
+                int cellId = cellIds->GetId(j);
+                ptIds->Reset();
+
+                // collect cell points
+                poly->GetCellPoints(cellId, ptIds);
+
+                // iterate over all cell points
+                for (int k = 0; k < ptIds->GetNumberOfIds(); k++) {
+                    int ptId = ptIds->GetId(k);
+                    ptSet.insert(ptId);
+                }
+            }
+
+            // iterate over all neighbor points
+            std::set<int>::iterator iter = ptSet.begin();
+
+            // compute weight
+            vnl_vector<float> weights;
+            weights.set_size(ptSet.size());
+
+            for (int j = 0; iter != ptSet.end(); iter++, j++) {
+                int ptId = *iter;
+                double neighbor[3];
+                poly->GetPoint(ptId, neighbor);
+
+                double dist2 = math->Distance2BetweenPoints(center, neighbor);
+
+                // apply the heat kernel with the sigma
+                weights[j] = exp(-dist2/sigma2);
+            }
+
+            // add one for the center
+            double weightSum = weights.sum() + 1;
+            weights /= weightSum;
+
+
+            // iterate over neighbors and compute weighted sum
+            double smoothedValue = data->GetTuple1(i) / weightSum;
+            iter = ptSet.begin();
+
+            // compute the weighted averge
+            for (uint j = 0; j < ptSet.size(); j++, iter++) {
+                int ptId = *iter;
+                int value = data->GetTuple1(ptId);
+                smoothedValue += (value * weights[j]);
+            }
+            newData->SetTuple1(i, smoothedValue);
+        }
+
+
+        // prepare next iteration by copying newdata to data
+        data->DeepCopy(newData);
+    }
+
+    ofstream file(attrOutput.c_str());
+    for (int i = 0; i < poly->GetNumberOfPoints(); i++) {
+        file << data->GetTuple1(i) << endl;
+    }
+    file.close();
+}
+
+  int extraction(string image, string mesh, string intp, string dstv, double lowThreshold, string attrfileName, string smoothAttrFile, string meshOutput, string meshSampling) {
 
     cout << "Image: " << image << endl;
     cout << "Mesh: " << mesh << endl;
@@ -152,6 +283,13 @@ namespace {
     reader->Update();
 
     vtkPolyData* vtkMesh = reader->GetOutput();
+
+
+    // keep the original mesh in order to compute smoothed scalars
+    vtkPolyData* sourceMesh = vtkPolyData::New();
+    sourceMesh->DeepCopy(vtkMesh);
+    
+     
     vtkPoints* points = vtkMesh->GetPoints();
 
     DistanceFilterType::Pointer distance = DistanceFilterType::New();
@@ -200,7 +338,7 @@ namespace {
     //int numPoints = points->Size();
     int numPoints = points->GetNumberOfPoints();
     double* extractValue = new double[numPoints];
-    memset(extractValue, 0, sizeof(extractValue));
+    memset(extractValue, 0, sizeof(double) * numPoints);
 
     int e[3] = { 1, 1, 1 };
     ofstream attr;
@@ -214,8 +352,8 @@ namespace {
 	
 			if (_inputAsPhysicalCoord) {
 				ImageType::PointType meshPoint;
-				meshPoint[0] = p[0];
-				meshPoint[1] = p[1];
+				meshPoint[0] = (_inputPointFlip ? -1 : 1) * p[0];
+				meshPoint[1] = (_inputPointFlip ? -1 : 1) * p[1];
 				meshPoint[2] = p[2];
 
 				itk::ContinuousIndex<double, 3> meshIndex;
@@ -226,7 +364,7 @@ namespace {
 				pointIndex[2] = meshIndex[2];
 			} else {
 				for (unsigned int d = 0; d < 3; d++) {
-					pointIndex[d] = (e[d] * p[d]) / spacing[d];
+					pointIndex[d] = (e[d] * (_inputPointFlip ? -1 : 1) * p[d]) / spacing[d];
 				}
 			}
 	
@@ -278,14 +416,32 @@ namespace {
     vtkMesh->GetPointData()->AddArray(arr);
 
 
-    vtkPolyDataWriter* writer = vtkPolyDataWriter::New();
-    writer->SetFileName(meshOutput.c_str());
-    writer->SetInput(vtkMesh);
-    writer->Write();
+
+    // add the samples to the original mesh
+    sourceMesh->GetPointData()->AddArray(arr);
+
+    // execute scalar smoothing
+    runSmoothScalars(sourceMesh, smoothAttrFile, 1, 10);
+
+    // added smoothed sample to the modified mesh
+    vtkMesh->GetPointData()->AddArray(sourceMesh->GetPointData()->GetScalars("smooth_sample"));
+
+    vtkPolyDataWriter* writer1 = vtkPolyDataWriter::New();
+    writer1->SetFileName(meshSampling.c_str());
+    writer1->SetInput(vtkMesh);
+    writer1->Write();
+
+    vtkPolyDataWriter* writer2 = vtkPolyDataWriter::New();
+    writer2->SetFileName(meshOutput.c_str());
+    writer2->SetInput(sourceMesh);
+    writer2->Write();
 
     return 0;
   }
 }
+
+
+
 
 int main(int argc, char* argv[]) {
   PARSE_ARGS;
@@ -293,10 +449,11 @@ int main(int argc, char* argv[]) {
   itksys::SystemTools::ChangeDirectory(workingDirectory.c_str());
   _overwriteDistanceVector = overwriteDistanceVector;
 	_inputAsPhysicalCoord = inputAsPhysicalCoord;
+  _inputPointFlip = inputPointFlip;
 
   if (thresholdDistanceVector) {
     ::thresholdDistanceVector(distanceVector, thresholdVectorOutput);
   } else {
-    ::extraction(imageName, meshName, interpolation, distanceVector, lowThreshold, attrfileName, meshOutput);
+    ::extraction(imageName, meshName, interpolation, distanceVector, lowThreshold, attrfileName, smoothAttrFileName, originalMeshOutput, modifiedMeshOutput);
   }
 }
