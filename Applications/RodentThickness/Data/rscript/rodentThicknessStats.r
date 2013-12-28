@@ -49,15 +49,26 @@ clStd = apply(cl,1,sd);
 meanDiff = clMeans - flMeans;
 stdDiff  = clStd - flStd;
 
+clRatio = 100*meanDiff / clMeans * sapply(pvalues, function(x) if (x < 0.05) { 1 } else { 0 } );
+flRatio = 100*meanDiff / flMeans * sapply(pvalues, function(x) if (x < 0.05) { 1 } else { 0 } );
+
+meanDiffMask = meanDiff * sapply(pvalues, function(x) if (x < 0.05) { 1 } else { 0 } );
+meanDiffIndex = sapply(meanDiffMask, function(x) if (x >= 0) { floor(x / 100) * 100 } else { ceiling(x / 100) * 100 });
+
+
 name1 = paste(c(firstgroup, "Mean"), collapse = "_") ;
 name2 = paste(c(secondgroup, "Mean"), collapse = "_") ;
 name3 = paste(c(name1, name2), collapse = "-") ;
 name4 = paste(c(firstgroup, "Sd"), collapse = "_") ;
 name5 = paste(c(secondgroup, "Sd"), collapse = "_") ;
+name6 = paste(c(firstgroup, "Ratio"), collapse = "_");
+name7 = paste(c(secondgroup, "Ratio"), collapse = "_");
+name8 = paste(c(firstgroup, secondgroup, "Index"), collapse = "_");
+
 # manual t-test computation
 #ttest = (clMean-flMean)/(clStd^2/ncol(cl)+flStd^2/ncol(fl))^0.5;
 #pvalues = pt(ttest, ncol(cl)+ncol(fl)-2);
 
-outputTable = cbind(clMeans,flMeans,meanDiff,clStd,flStd,tscores,pvalues,adjpvalues,wscores,wpvalues,wadjpvalues);
-colnames(outputTable) = c(name1, name2, name3, name4, name5, "t.scores", "t.pvalue", "t.adjpvalue", "w.scores", "w.pvalue", "w.adjpvalue");
+outputTable = cbind(clMeans,flMeans,meanDiff,clStd,flStd,tscores,pvalues,adjpvalues,wscores,wpvalues,wadjpvalues, clRatio, flRatio, meanDiffIndex);
+colnames(outputTable) = c(name1, name2, name3, name4, name5, "t.scores", "t.pvalue", "t.adjpvalue", "w.scores", "w.pvalue", "w.adjpvalue", name6, name7, name8);
 write.csv(outputTable, row.names=FALSE, file=outfile);

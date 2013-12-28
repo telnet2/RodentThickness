@@ -154,9 +154,9 @@ int ScriptRunner :: RunBatchmakeScript(std::string dataset,std::string configfil
 					bm::ScriptParser m_Parser;
 					if(m_Parser.Execute(BatchMakeScriptFile)==false ) error=1;	//Run the batchmake script where ThicknessSpharm.bms (Data) is included 
 					
-					if(!itksys::SystemTools::GetPermissions((WorkDir+"/Processing/1.MeasurementandSPHARM/"+value1+".ip.SPHARM.vtk").c_str(), ITKmode_F_OK)) existingfile=0;
+					//if(!itksys::SystemTools::GetPermissions((WorkDir+"/Processing/1.MeasurementandSPHARM/"+value1+".ip.SPHARM.vtk").c_str(), ITKmode_F_OK)) existingfile=0;
 				
-					if(!itksys::SystemTools::GetPermissions((WorkDir+"/Processing/1.MeasurementandSPHARM/"+value1+".subj.SPHARM.vtk").c_str(), ITKmode_F_OK)) existingfile=0;
+					//if(!itksys::SystemTools::GetPermissions((WorkDir+"/Processing/1.MeasurementandSPHARM/"+value1+".subj.SPHARM.vtk").c_str(), ITKmode_F_OK)) existingfile=0;
 
 				}
 				i++;
