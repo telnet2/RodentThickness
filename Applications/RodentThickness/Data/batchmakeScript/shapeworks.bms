@@ -29,9 +29,9 @@
 #WriteFile (${WorkDir}/outputdataset.csv group,subjId,labelMapInput,measurementoutput,surfacemodels,correspondenceMesh,ThicknessSamplingResults,labelCortex,labelBrain,labelOutside\n)
 
 GetFilename(ScriptDir ${ShapeWorksPythonScriptPath} PATH)
-#Set (cmdline ${PythonPath} ${ScriptDir}/run.py --computeThickness --precorrespondence --runcorrespondence --runstat ${WorkDir}/dataset.csv ${WorkDir}/RodentThicknessConfigfile.bms ${WorkDir})
+Set (cmdline ${PythonPath} ${ScriptDir}/run.py --computeThickness --precorrespondence --runcorrespondence --runstat ${WorkDir}/dataset.csv ${WorkDir}/RodentThicknessConfigfile.bms ${WorkDir})
 #Set (cmdline ${PythonPath} ${ScriptDir}/run.py --precorrespondence --runstat ${WorkDir}/dataset.csv ${WorkDir}/RodentThicknessConfigfile.bms ${WorkDir})
-Set (cmdline ${PythonPath} ${ScriptDir}/run.py  --runstat ${WorkDir}/dataset.csv ${WorkDir}/RodentThicknessConfigfile.bms ${WorkDir})
+#Set (cmdline ${PythonPath} ${ScriptDir}/run.py  --runstat ${WorkDir}/dataset.csv ${WorkDir}/RodentThicknessConfigfile.bms ${WorkDir})
 Echo (${cmdline})
 Run (output ${cmdline})
 
