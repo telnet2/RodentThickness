@@ -25,5 +25,10 @@ ADD_EXECUTABLE(BinaryToDistanceMap main.cxx BinToDistPreprocessingCLP.h)
 TARGET_LINK_LIBRARIES(BinaryToDistanceMap ${ITK_LIBRARIES})
 
     
-ADD_EXECUTABLE(kmesh kmesh.h kmesh.cpp piOptions.h piOptions.cpp vtkio.h vtkio.cpp)
+ADD_EXECUTABLE(kmesh kmesh.h kmesh.cpp kimage.h kimage.cpp kstreamtracer.h kstreamtracer.cpp piOptions.h piOptions.cpp vtkio.h vtkio.cpp)
 TARGET_LINK_LIBRARIES(kmesh ${VTK_LIBRARIES} ${ITK_LIBRARIES})
+
+INCLUDE_DIRECTORIES(muparser)
+FILE(GLOB muparser_SRC "muparser/*.cpp")
+ADD_EXECUTABLE(kcalc kcalc.cpp PixelMathImageFilter.h PixelMathImageFilter.hxx piOptions.h piOptions.cpp piImageIO.h ${muparser_SRC})
+TARGET_LINK_LIBRARIES(kcalc ${VTK_LIBRARIES} ${ITK_LIBRARIES})
