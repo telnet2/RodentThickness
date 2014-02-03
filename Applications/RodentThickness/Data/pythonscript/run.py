@@ -3,7 +3,8 @@
 
 from optparse import OptionParser
 import csv
-import os,os.path,re
+import os,os.path,re,sys
+
 
 '''
 This python script accepts .csv data set, .bms configurations, and output directory then produces statistical analysis results from the processed data
@@ -293,7 +294,9 @@ def precorrespondence(config, data, outputDir, ids):
     parafile = "%s/%s_para.vtk" % (workdir, id)
     surffile = "%s/%s_surf.vtk" % (workdir, id)
     initialMesh = "%s/%s.ip.SPHARM.vtk" % (workdir, id)
+    initialMeshPara = "%s/%s.ip.Param.vtk" % (workdir, id)
     surfaceMesh = "%s/%s.subj.SPHARM.vtk" % (workdir, id)
+    surfaceMeshPara = "%s/%s.subj.Param.vtk" % (workdir, id)
 
     if (not os.path.isfile(parafile)):
       cmd = "%s --EulerFile --outEulerName %s %s --label %s %s %s" % (pathGenParaMesh, eulerName, labelmap, ids, parafile, surffile)
@@ -302,17 +305,17 @@ def precorrespondence(config, data, outputDir, ids):
 
     if (not os.path.isfile(initialMesh) or os.stat(initialMesh).st_size == 0):
       if (prevId == ""):
-        cmd = "%s %s %s --subdivLevel 10 --spharmDegree 20  %s/%s.ip." % (pathParaToSPHARM, parafile, surffile, workdir, id)
+        cmd = "%s %s %s --subdivLevel 10 --spharmDegree 20  %s/%s.ip. -paraOut" % (pathParaToSPHARM, parafile, surffile, workdir, id)
       else:
-        cmd = "%s %s %s --subdivLevel 10 --spharmDegree 20  %s/%s.ip. --flipTemplateOn --flipTemplate %s/%s.ip.SPHARM.coef" % (pathParaToSPHARM, parafile, surffile, workdir, id, workdir, prevId)
+        cmd = "%s %s %s --subdivLevel 10 --spharmDegree 20  %s/%s.ip. --flipTemplateOn --flipTemplate %s/%s.ip.SPHARM.coef -paraOut" % (pathParaToSPHARM, parafile, surffile, workdir, id, workdir, prevId)
       print cmd
       os.system(cmd)
 
     if (not os.path.isfile(surfaceMesh) or os.stat(surfaceMesh).st_size == 0):
       if (prevId == ""):
-        cmd = "%s %s %s --subdivLevel 50 --spharmDegree 20  %s/%s.subj." % (pathParaToSPHARM, parafile, surffile, workdir, id)
+        cmd = "%s %s %s --subdivLevel 50 --spharmDegree 20  %s/%s.subj. -paraOut" % (pathParaToSPHARM, parafile, surffile, workdir, id)
       else:
-        cmd = "%s %s %s --subdivLevel 50 --spharmDegree 20  %s/%s.subj. --flipTemplateOn --flipTemplate %s/%s.subj.SPHARM.coef" % (pathParaToSPHARM, parafile, surffile, workdir, id, workdir, prevId)
+        cmd = "%s %s %s --subdivLevel 50 --spharmDegree 20  %s/%s.subj. --flipTemplateOn --flipTemplate %s/%s.subj.SPHARM.coef -paraOut" % (pathParaToSPHARM, parafile, surffile, workdir, id, workdir, prevId)
       print cmd
       os.system(cmd)
       
@@ -416,6 +419,38 @@ def runcorrespondence(bmsfile, config, data, outputdir, ids):
   print cmd
   os.system(cmd)
 
+
+
+def performSplit(opts, args):
+  outputPattern = opts.outputPattern
+  # read each argument file
+  for inputFile in args:
+    fin = open(inputFile)
+    lines = fin.readlines()
+    outputLines = {}
+    # iterate over the entire lines
+    for line in lines:
+      words = line.split("\t")
+      regionId = int(words[0])
+      # skip if the region is 0
+      if (regionId == 0):
+        continue
+      # otherwise, add to outputLines separately
+      if (regionId in outputLines):
+        outputLines[regionId].append(line)
+      else:
+        outputLines[regionId] = [ line ]
+    fin.close()
+    # write all region lines
+    for region in outputLines:
+      ofile = outputPattern % (region)
+      fout = open(ofile, "w")
+      for line in outputLines[region]:
+        fout.write(line)
+      fout.close()
+      
+
+# @brief Main function
 if (__name__ == "__main__"):
   parser = OptionParser(usage="usage: %prog dataset.csv config.bms output-directory")
 #  parser.add_option("--labelprocessing", help="preprocessing for label map generation", action="store_true", dest="labelprocessing")
@@ -432,7 +467,15 @@ if (__name__ == "__main__"):
   parser.add_option("--labelNCright", help="label id for NC right", dest="labelNCright", default="14")
   parser.add_option("--labelOB", help="label id for Olfactory Bulb", dest="labelOB", default="16")
 
+  parser.add_option("--regionSplit", help="split the data file with its region (1st column)", dest="regionSplit", action="store_true")
+  parser.add_option("--outputPattern", help="Specify the output pattern ex) --outputPattern region_control_%02d.txt", dest="outputPattern")
+
   (opts, args) = parser.parse_args()
+
+
+  if (opts.regionSplit):
+    performSplit(opts, args)
+    sys.exit(0)
 
   if (len(args) < 3):
     parser.print_help()

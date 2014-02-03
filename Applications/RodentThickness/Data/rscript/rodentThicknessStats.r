@@ -36,11 +36,14 @@ clMeans = sapply(alltest, function(x) x$estimate[1]);
 flMeans = sapply(alltest, function(x) x$estimate[2]);
 
 print("Start wilcox-test")
-ranktest = apply(alldata,1,function(x) wilcox.test(x[clCols],x[flCols]));
+ranktest = apply(alldata,1,function(x) tryCatch(wilcox.test(x[clCols],x[flCols]), error = 1));
+print("done..")
 
 wpvalues = sapply(ranktest, function(x) x$p.value);
 wscores = sapply(ranktest, function(x) x$statistic);
+print("FDR ...")
 wadjpvalues = p.adjust(wpvalues, method='fdr');
+print("done ...")
 
 
 flStd = apply(fl,1,sd);
@@ -49,11 +52,21 @@ clStd = apply(cl,1,sd);
 meanDiff = clMeans - flMeans;
 stdDiff  = clStd - flStd;
 
-clRatio = 100*meanDiff / clMeans * sapply(pvalues, function(x) if (x < 0.05) { 1 } else { 0 } );
-flRatio = 100*meanDiff / flMeans * sapply(pvalues, function(x) if (x < 0.05) { 1 } else { 0 } );
+print(pvalues)
+filter_significant <- function(x) {
+  if (is.nan(x)) {
+    return(NaN);
+  } else if (x < 0.05) {
+    return(1);
+  } else {
+    return(0);
+  }
+}
+clRatio = 100*meanDiff / clMeans * sapply(pvalues, filter_significant);
+flRatio = 100*meanDiff / flMeans * sapply(pvalues, filter_significant);
 
-meanDiffMask = meanDiff * sapply(pvalues, function(x) if (x < 0.05) { 1 } else { 0 } );
-meanDiffIndex = sapply(meanDiffMask, function(x) if (x >= 0) { floor(x / 100) * 100 } else { ceiling(x / 100) * 100 });
+meanDiffMask = meanDiff * sapply(pvalues, filter_significant);
+meanDiffIndex = sapply(meanDiffMask, function(x) if (is.nan(x)) { return(NaN); } else if (x >= 0) { floor(x / 100) * 100 } else { ceiling(x / 100) * 100 });
 
 
 name1 = paste(c(firstgroup, "Mean"), collapse = "_") ;
@@ -71,4 +84,4 @@ name8 = paste(c(firstgroup, secondgroup, "Index"), collapse = "_");
 
 outputTable = cbind(clMeans,flMeans,meanDiff,clStd,flStd,tscores,pvalues,adjpvalues,wscores,wpvalues,wadjpvalues, clRatio, flRatio, meanDiffIndex);
 colnames(outputTable) = c(name1, name2, name3, name4, name5, "t.scores", "t.pvalue", "t.adjpvalue", "w.scores", "w.pvalue", "w.adjpvalue", name6, name7, name8);
-write.csv(outputTable, row.names=FALSE, file=outfile);
+write.csv(outputTable, row.names=FALSE, file=outfile, na="NaN");
