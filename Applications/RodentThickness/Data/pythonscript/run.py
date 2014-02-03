@@ -36,11 +36,14 @@ def file2string(f):
   return lines
    
 
-def concatColumnsToFile(input, output):
-  if (input != ""):
-    args = file2string(input)
+def concatColumnsToFile(input, output, inputIsList=False):
+  if (inputIsList):
+    args = input
   else:
-    return
+    if (input != ""):
+      args = file2string(input)
+    else:
+      return
   lines = countLines(args)
   if (len(lines) == 0):
     print "Empty files"
@@ -164,19 +167,28 @@ def performAnalysis(cvsdata, config, outputDir, opt="initial_dense"):
   # aggregate sampling files into a single file
   groupSet = set(groups)
   datafiles = []
+  tag = ""
   for group in groupSet:
     # setup output filename template
     if (opt == "initial_dense"):
+      tag = "_initialDenseSampling"
       datafilename = "%s/data_initialDenseSampling_%s.txt" % (statDir, group)
+      dataregionfilename = "%s/data_region_initialDenseSampling_%s.txt" % (statDir, group)
       outfilename = "%s/list_initialDenseSampling_%s.txt" % (statDir, group)
     elif (opt == "correspondence"):
+      tag = ""
       datafilename = "%s/data_%s.txt" % (statDir, group)
+      dataregionfilename = "%s/data_region_%s.txt" % (statDir, group)
       outfilename = "%s/list_%s.txt" % (statDir, group)
     elif (opt == "dense_correspondence"):
+      tag = "_dense"
       datafilename = "%s/data_dense_%s.txt" % (statDir, group)
+      dataregionfilename = "%s/data_region_dense_%s.txt" % (statDir, group)
       outfilename = "%s/list_dense_%s.txt" % (statDir, group)
     elif (opt == "spharm_sampling"):
+      tag = "_spharm"
       datafilename = "%s/data_spharm_%s.txt" % (statDir, group)
+      dataregionfilename = "%s/data_region_spharm_%s.txt" % (statDir, group)
       outfilename = "%s/list_spharm_%s.txt" % (statDir, group)
 
 
@@ -237,6 +249,31 @@ def performAnalysis(cvsdata, config, outputDir, opt="initial_dense"):
 
   visCmd = "%s %s %s %s -i %s -t" % (pythonPath, pythonScriptPath, inputVTK, outputVTK, outputfile)
   os.system(visCmd)
+
+  # connected components for p-value
+  print "computing connected components with t.pvalue..."
+  runCmd = "%s -connectScalars %s -scalarName t.pvalue %s -thresholdMin 0 -thresholdMax 0.05" % (pathKmesh, outputVTK, outputVTK)
+  os.system(runCmd)
+
+  print "export scalars..."
+  runCmd = "%s -exportScalars -scalarName RegionIds %s %s/regionIds.txt" % (pathKmesh, outputVTK, statDir)
+  os.system(runCmd)
+
+  # create a combined data file with regions
+  for (group, file) in datafiles:
+    dataregionfilename = "%s/data_region%s_%s.txt" % (statDir, tag, group)
+    concatColumnsToFile(["%s/regionIds.txt" % (statDir), "%s/data%s_%s.txt" % (statDir, tag, group)], dataregionfilename, inputIsList = True)
+    # perform splitting
+    performSplit([dataregionfilename], "%s/data_%s_region_" % (statDir, group) + "%02d.txt")
+
+  # boxplot
+  groupList = list(groupSet)
+  runCmd = "%s %s '%s' '%s' %s_%s_regions.pdf --label1 %s --label2 %s" % (pythonPath, pythonScriptPath.replace("vtkPointAttributes.py", "boxplot.py"), "%s/data_%s_region_*.txt" % (statDir, groupList[0]), "%s/data_%s_region_*.txt" % (statDir, groupList[1]), groupList[0], groupList[1], groupList[0], groupList[1])
+  print runCmd
+  os.system(runCmd)
+
+
+
 
 
 
@@ -347,7 +384,7 @@ def precorrespondence(config, data, outputDir, ids):
   outputWarpedFiles.close()
 
 # @brief compute consistent boundary conditions from surface maps
-def computeConsistentBoundaryConditions(data, config, outputdir):
+def correctBoundaryConditions(data, config, outputdir):
   pathKmesh = config["kmeshPath"]
   pathKcalc = config["kcalcPath"]
   workdir = "%s/Processing/1.MeasurementandSPHARM" % (outputdir)
@@ -421,8 +458,7 @@ def runcorrespondence(bmsfile, config, data, outputdir, ids):
 
 
 
-def performSplit(opts, args):
-  outputPattern = opts.outputPattern
+def performSplit(args, outputPattern):
   # read each argument file
   for inputFile in args:
     fin = open(inputFile)
@@ -474,7 +510,8 @@ if (__name__ == "__main__"):
 
 
   if (opts.regionSplit):
-    performSplit(opts, args)
+    performSplit(args, opts.outputPattern)
+    # just finish the script
     sys.exit(0)
 
   if (len(args) < 3):
@@ -514,14 +551,14 @@ if (__name__ == "__main__"):
     if (opts.precorrespondence):
       precorrespondence(config, csvdata, outputdir, opts.ids)
     if (opts.boundaryCorrection):
-      computeConsistentBoundaryConditions(csvdata, config, outputdir)
+      correctBoundaryConditions(csvdata, config, outputdir)
     if (opts.computeThickness):
       computeThickness(config, csvdata, outputdir, opts.ids, opts.idl, opts.idh)
     if (opts.runcorrespondence):
       runcorrespondence(bmsfile, config, csvdata, outputdir, opts.ids)
     if (opts.runstats):
-      performAnalysis(csvdata, config, outputdir, "spharm_sampling")
-#      performAnalysis(csvdata, config, outputdir, "initial_dense")
+#      performAnalysis(csvdata, config, outputdir, "spharm_sampling")
+      performAnalysis(csvdata, config, outputdir, "initial_dense")
 #      performAnalysis(csvdata, config, outputdir, "correspondence")
 
 

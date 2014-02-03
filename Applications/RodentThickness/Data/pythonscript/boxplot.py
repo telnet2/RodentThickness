@@ -14,8 +14,15 @@ parser.add_option("-2", "--label2", help="name for legend2", dest="label2", defa
 
 (opts, args) = parser.parse_args()
 
+
+print args[0], args[1]
+
 g1 = glob.glob(args[0])
 g2 = glob.glob(args[1])
+
+
+print g1
+print g2
 
 
 # function for setting the colors of the box plots pairs
@@ -99,5 +106,5 @@ hB.set_visible(False)
 hR.set_visible(False)
 
 savefig(args[2])
-show()
+#show()
 
