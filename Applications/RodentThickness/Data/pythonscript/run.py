@@ -103,7 +103,7 @@ def performAnalysis(cvsdata, config, outputDir, opt="initial_dense"):
   for id in ids:
     distanceVector = "%s/%s.distanceVector.nrrd" % (sampleDir, id)
     inputMeasurement = "%s/%s_measurementoutput.nrrd" % (meshDir, id)
-    inputMeasurement = "%s/%s.thickness.mha" % (meshDir, id)
+#    inputMeasurement = "%s/%s.thickness.mha" % (meshDir, id)
     if (opt == "initial_dense"):
       samplingTxt = "%s/%s.initialDenseSampling.txt" % (sampleDir, id)
       smoothSamplingTxt = "%s/%s.smoothInitialDenseSampling.txt" % (sampleDir, id)
@@ -244,33 +244,40 @@ def performAnalysis(cvsdata, config, outputDir, opt="initial_dense"):
   for (group, file) in datafiles:
     datafilelist = datafilelist + " " + file
     datagroups = datagroups + " " + group
-  runCmd = "%s %s %s %s %s" % (rscriptExePath, rscriptPath, datafilelist, outputfile, datagroups)
-  os.system(runCmd)
 
-  visCmd = "%s %s %s %s -i %s -t" % (pythonPath, pythonScriptPath, inputVTK, outputVTK, outputfile)
-  os.system(visCmd)
+    # compute per-group statistics
+    cmd = "%s -computeVectorStats -scalarName %s -importVectors %s %s %s/%s_thickness.vtk" % (pathKmesh, group + "_Thickness", inputVTK, file, statDir, group)
+    print cmd
+    os.system(cmd)
 
-  # connected components for p-value
-  print "computing connected components with t.pvalue..."
-  runCmd = "%s -connectScalars %s -scalarName t.pvalue %s -thresholdMin 0 -thresholdMax 0.05" % (pathKmesh, outputVTK, outputVTK)
-  os.system(runCmd)
 
-  print "export scalars..."
-  runCmd = "%s -exportScalars -scalarName RegionIds %s %s/regionIds.txt" % (pathKmesh, outputVTK, statDir)
-  os.system(runCmd)
+  if (len(datafiles) > 1):
+    runCmd = "%s %s %s %s %s" % (rscriptExePath, rscriptPath, datafilelist, outputfile, datagroups)
+    os.system(runCmd)
+    visCmd = "%s %s %s %s -i %s -t" % (pythonPath, pythonScriptPath, inputVTK, outputVTK, outputfile)
+    os.system(visCmd)
 
-  # create a combined data file with regions
-  for (group, file) in datafiles:
-    dataregionfilename = "%s/data_region%s_%s.txt" % (statDir, tag, group)
-    concatColumnsToFile(["%s/regionIds.txt" % (statDir), "%s/data%s_%s.txt" % (statDir, tag, group)], dataregionfilename, inputIsList = True)
-    # perform splitting
-    performSplit([dataregionfilename], "%s/data_%s_region_" % (statDir, group) + "%02d.txt")
+    # connected components for p-value
+    print "computing connected components with t.pvalue..."
+    runCmd = "%s -connectScalars %s -scalarName t.pvalue %s -thresholdMin 0 -thresholdMax 0.05" % (pathKmesh, outputVTK, outputVTK)
+    os.system(runCmd)
 
-  # boxplot
-  groupList = list(groupSet)
-  runCmd = "%s %s '%s' '%s' %s_%s_regions.pdf --label1 %s --label2 %s" % (pythonPath, pythonScriptPath.replace("vtkPointAttributes.py", "boxplot.py"), "%s/data_%s_region_*.txt" % (statDir, groupList[0]), "%s/data_%s_region_*.txt" % (statDir, groupList[1]), groupList[0], groupList[1], groupList[0], groupList[1])
-  print runCmd
-  os.system(runCmd)
+    print "export scalars..."
+    runCmd = "%s -exportScalars -scalarName RegionIds %s %s/regionIds.txt" % (pathKmesh, outputVTK, statDir)
+    os.system(runCmd)
+
+    # create a combined data file with regions
+    for (group, file) in datafiles:
+      dataregionfilename = "%s/data_region%s_%s.txt" % (statDir, tag, group)
+      concatColumnsToFile(["%s/regionIds.txt" % (statDir), "%s/data%s_%s.txt" % (statDir, tag, group)], dataregionfilename, inputIsList = True)
+      # perform splitting
+      performSplit([dataregionfilename], "%s/data_%s_region_" % (statDir, group) + "%02d.txt")
+
+    # boxplot
+    groupList = list(groupSet)
+    runCmd = "%s %s '%s' '%s' %s/%s_%s_regions.pdf --label1 %s --label2 %s" % (pythonPath, pythonScriptPath.replace("vtkPointAttributes.py", "boxplot.py"), "%s/data_%s_region_*.txt" % (statDir, groupList[0]), "%s/data_%s_region_*.txt" % (statDir, groupList[1]), statDir, groupList[0], groupList[1], groupList[0], groupList[1])
+    print runCmd
+    os.system(runCmd)
 
 
 
@@ -298,13 +305,13 @@ def computeThickness(config, data, outputdir, ids, idl, idh):
     measurementoutput = "%s/Processing/1.MeasurementandSPHARM/%s_measurementoutput.nrrd" % (outputdir, id)
 
     # temporary
-    workdir = "%s/Processing/1.MeasurementandSPHARM/%s_2" % (outputdir, id)
+#    workdir = "%s/Processing/1.MeasurementandSPHARM/%s_2" % (outputdir, id)
     labelmap = "%s/Processing/1.MeasurementandSPHARM/%s.boundaryMap.mha" % (outputdir, id)
-    measurementoutput = "%s/Processing/1.MeasurementandSPHARM/%s.thickness.mha" % (outputdir, id)
+#    measurementoutput = "%s/Processing/1.MeasurementandSPHARM/%s.thickness.mha" % (outputdir, id)
 
     if (not os.path.exists(workdir)):
       os.makedirs(workdir)
-    if (not os.path.isfile(measurementoutput) or True):
+    if (not os.path.isfile(measurementoutput)):
       cmd = "%s --mr --sbt --workdir %s --ids %s --idl %s --idh %s --ttrns 500 %s %s" % (pathTool, workdir, ids, idl, idh, labelmap, measurementoutput)
       print cmd
       os.system(cmd)
@@ -328,6 +335,7 @@ def precorrespondence(config, data, outputDir, ids):
 
     workdir = "%s/Processing/1.MeasurementandSPHARM" % (outputDir)
     eulerName = "%s/EulerFile/Euler_%s.txt" % (workdir, id)
+    logFileName = "%s/%s_log.txt" % (workdir, id)
     parafile = "%s/%s_para.vtk" % (workdir, id)
     surffile = "%s/%s_surf.vtk" % (workdir, id)
     initialMesh = "%s/%s.ip.SPHARM.vtk" % (workdir, id)
@@ -336,23 +344,23 @@ def precorrespondence(config, data, outputDir, ids):
     surfaceMeshPara = "%s/%s.subj.Param.vtk" % (workdir, id)
 
     if (not os.path.isfile(parafile)):
-      cmd = "%s --EulerFile --outEulerName %s %s --label %s %s %s" % (pathGenParaMesh, eulerName, labelmap, ids, parafile, surffile)
+      cmd = "%s --EulerFile --outEulerName %s --logFile --outLogName %s %s --label %s %s %s" % (pathGenParaMesh, eulerName, logFileName, labelmap, ids, parafile, surffile)
       print cmd
       os.system(cmd)
 
     if (not os.path.isfile(initialMesh) or os.stat(initialMesh).st_size == 0):
       if (prevId == ""):
-        cmd = "%s %s %s --subdivLevel 10 --spharmDegree 20  %s/%s.ip. -paraOut" % (pathParaToSPHARM, parafile, surffile, workdir, id)
+        cmd = "%s %s %s --subdivLevel 10 --spharmDegree 20  %s/%s.ip. --paraOut" % (pathParaToSPHARM, parafile, surffile, workdir, id)
       else:
-        cmd = "%s %s %s --subdivLevel 10 --spharmDegree 20  %s/%s.ip. --flipTemplateOn --flipTemplate %s/%s.ip.SPHARM.coef -paraOut" % (pathParaToSPHARM, parafile, surffile, workdir, id, workdir, prevId)
+        cmd = "%s %s %s --subdivLevel 10 --spharmDegree 20  %s/%s.ip. --flipTemplateOn --flipTemplate %s/%s.ip.SPHARM.coef --paraOut" % (pathParaToSPHARM, parafile, surffile, workdir, id, workdir, prevId)
       print cmd
       os.system(cmd)
 
     if (not os.path.isfile(surfaceMesh) or os.stat(surfaceMesh).st_size == 0):
       if (prevId == ""):
-        cmd = "%s %s %s --subdivLevel 50 --spharmDegree 20  %s/%s.subj. -paraOut" % (pathParaToSPHARM, parafile, surffile, workdir, id)
+        cmd = "%s %s %s --subdivLevel 50 --spharmDegree 20  %s/%s.subj. --paraOut" % (pathParaToSPHARM, parafile, surffile, workdir, id)
       else:
-        cmd = "%s %s %s --subdivLevel 50 --spharmDegree 20  %s/%s.subj. --flipTemplateOn --flipTemplate %s/%s.subj.SPHARM.coef -paraOut" % (pathParaToSPHARM, parafile, surffile, workdir, id, workdir, prevId)
+        cmd = "%s %s %s --subdivLevel 50 --spharmDegree 20  %s/%s.subj. --flipTemplateOn --flipTemplate %s/%s.subj.SPHARM.coef --paraOut" % (pathParaToSPHARM, parafile, surffile, workdir, id, workdir, prevId)
       print cmd
       os.system(cmd)
       

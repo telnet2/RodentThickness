@@ -11,6 +11,7 @@
 
 #include <set>
 #include <iostream>
+#include <algorithm>
 
 #include "piOptions.h"
 #include "vtkio.h"
@@ -31,6 +32,7 @@
 #include <vtkCellData.h>
 #include <vtkLine.h>
 #include <vtkPolyLine.h>
+#include <vtkTriangle.h>
 #include <vtkCleanPolyData.h>
 #include <vtkMath.h>
 #include <vtkSmoothPolyDataFilter.h>
@@ -41,6 +43,14 @@
 #include <vtkPolyDataToImageStencil.h>
 #include <vtkMetaImageWriter.h>
 #include <vtkImageStencil.h>
+#include <vtkPCAAnalysisFilter.h>
+#include <vtkProcrustesAlignmentFilter.h>
+#include <vtkLandmarkTransform.h>
+#include <vtkPolyDataConnectivityFilter.h>
+#include <vtkThreshold.h>
+#include <vtkConnectivityFilter.h>
+#include <vtkPolyDataNormals.h>
+#include <vtkTransform.h>
 
 
 #include <itkImage.h>
@@ -49,9 +59,17 @@
 #include <itkSpatialObjectToImageFilter.h>
 #include <itkNearestNeighborInterpolateImageFunction.h>
 
+#include <vnl/vnl_matrix.h>
+#include <vnl/vnl_sparse_matrix.h>
+#include <vnl/vnl_sparse_matrix_linear_system.h>
+#include <vnl/algo/vnl_lsqr.h>
+#include <vnl/algo/vnl_matrix_update.h>
+#include <vnl/algo/vnl_symmetric_eigensystem.h>
+
 #include "piImageIO.h"
 #include "kimage.h"
 #include "kstreamtracer.h"
+
 
 
 
@@ -65,7 +83,7 @@ using namespace pi;
 /// @param v a input point in the cartesian coordinate
 /// @param phi output parameter for phi
 /// @param theta output parameter for theta
-static void cart2sph(const float *v, float *phi, float *theta) {
+static void cart2sph(const double *v, double *phi, double *theta) {
     // phi: azimuth, theta: elevation
     float d = v[0] * v[0] + v[1] * v[1];
     *phi = (d == 0) ? 0: atan2(v[1], v[0]);
@@ -82,11 +100,58 @@ static double factorial(double x, double y) {
     return f;
 }
 
+
+static void legendre(int n, float x, float* Y) {
+    if (n < 0) return;
+
+    float **P = new float*[n + 1];
+    for (int i = 0; i <= n; i++) P[i] = new float[n + 1];
+    float factor = -sqrt(1.0 - pow(x,2));
+
+    // Init legendre
+    P[0][0] = 1.0;        // P_0,0(x) = 1
+    if (n == 0)
+    {
+        Y[0] = P[0][0];
+        return;
+    }
+
+    // Easy values
+    P[1][0] = x;      // P_1,0(x) = x
+    P[1][1] = factor;     // P_1,1(x) = −sqrt(1 − x^2)
+    if (n == 1)
+    {
+        Y[0] = P[1][0];
+        Y[1] = P[1][1];
+        return;
+    }
+
+    for (int l = 2; l <= n; l++)
+    {
+        for (int m = 0; m < l - 1 ; m++)
+        {
+            // P_l,m = (2l-1)*x*P_l-1,m - (l+m-1)*x*P_l-2,m / (l-k)
+            P[l][m] = ((float)(2 * l - 1) * x * P[l - 1][m] - (float)(l + m - 1) * P[l - 2][m]) / (float)(l - m);
+        }
+        // P_l,l-1 = (2l-1)*x*P_l-1,l-1
+        P[l][l-1] = (float)(2 * l - 1) * x * P[l-1][l-1];
+        // P_l,l = (2l-1)*factor*P_l-1,l-1
+        P[l][l] = (float)(2 * l - 1) * factor * P[l-1][l-1];
+    }
+
+    for (int i = 0; i <= n; i++) Y[i] = P[n][i];
+
+    // release memory
+    for (int i = 0; i <= n; i++) delete [] P[i];
+    delete [] P;
+}
+
+
 /// @brief Compute the basis function for spherical harmonics
-static void basis(int degree, float *p, float *Y) {
+static void spharm_basis(int degree, double *p, double *Y) {
     // real spherical harmonics basis functions
     // polar coordinate
-    float phi, theta;
+    double phi, theta;
     cart2sph(p, &phi, &theta);
     theta = M_PI_2 - theta;  // convert to interval [0, PI]
     float *Pm = new float[degree + 1];
@@ -100,6 +165,7 @@ static void basis(int degree, float *p, float *Y) {
     {
         // legendre part
 //        Series::legendre(l, cos(theta), Pm);
+        legendre(l, cos(theta), Pm);
         float lconstant = sqrt((2 * l + 1) / (4 * M_PI));
 
         int center = (l + 1) * (l + 1) - l - 1;
@@ -120,6 +186,57 @@ static void basis(int degree, float *p, float *Y) {
     delete [] Pm;
 }
 
+void runSPHARMCoeff(Options& opts, StringVector& args) {
+    string inputFile = args[0];
+
+    vtkIO vio;
+    vtkPolyData* input = vio.readFile(inputFile);
+    const unsigned int nPoints = input->GetNumberOfPoints();
+
+    vtkDataArray* scalars = input->GetPointData()->GetScalars(opts.GetString("-scalarName").c_str());
+    if (scalars == NULL) {
+        cout << "Can't read scalars: " << opts.GetString("-scalarName") << endl;
+        return;
+    }
+
+    int degree = 20;
+
+
+    /// Prepare values
+    vnl_vector<double> values;
+    values.set_size(scalars->GetNumberOfTuples());
+    for (int i = 0; i < nPoints; i++) {
+        values[i] = scalars->GetTuple1(i);
+    }
+
+    /// Prepare the vandermonde matrix from spharm basis
+    vnl_matrix<double> bases;
+    bases.set_size(nPoints, (degree-1)*(degree-1));
+
+    for (uint i = 0; i < nPoints; i++) {
+        double p[3];
+        input->GetPoints()->GetPoint(i,p);
+        spharm_basis(degree, p, bases[i]);
+    }
+
+    vnl_matrix_inverse<double> inv(bases);
+    vnl_vector<double> coeffs = inv.pinverse() * values;
+
+    vnl_vector<double> interpolated = bases * coeffs;
+    vtkDoubleArray* newScalars = vtkDoubleArray::New();
+    newScalars->SetName(opts.GetString("-outputScalarName", "NewScalars").c_str());
+    newScalars->SetNumberOfComponents(1);
+    newScalars->SetNumberOfTuples(nPoints);
+
+    for (int i = 0; i < nPoints; i++) {
+        newScalars->SetValue(i, interpolated[i]);
+    }
+    input->GetPointData()->AddArray(newScalars);
+
+    vio.writeFile(args[1], input);
+
+    return;
+}
 
 // append polydatas into one
 void runAppendData(Options& opts, StringVector& args) {
@@ -206,6 +323,125 @@ void runExportScalars(Options& opts, StringVector& args) {
         file << scalar->GetTuple1(i) << endl;
     }
     file.close();
+}
+
+
+/// @brief Import vector values
+void runImportVectors(Options& opts, StringVector& args) {
+    string inputDataFile = args[0];
+    string vectorDataFile = args[1];
+    string outputDataFile = args[2];
+
+    string attributeName = opts.GetString("-scalarName", "VectorValues");
+    vtkIO vio;
+    vtkPolyData* inputData = vio.readFile(inputDataFile);
+    vtkFloatArray* vectorArray = vtkFloatArray::New();
+    vectorArray->SetName(attributeName.c_str());
+
+    char buff[1024];
+    ifstream fin(vectorDataFile.c_str());
+
+    int nCols = 0;
+    int nRows = 0;
+    while (fin.is_open() && !fin.eof()) {
+        fin.getline(buff, sizeof(buff));
+        stringstream ss(buff);
+        if (!fin.eof()) {
+            nCols = 0;
+            std::vector<float> rows;
+            while (ss.good()) {
+                float value;
+                ss >> value;
+                rows.push_back(value);
+                ++ nCols;
+            }
+            if (nRows == 0) {
+                vectorArray->SetNumberOfComponents(nCols);
+            }
+            vectorArray->InsertNextTupleValue(&rows[0]);
+            nRows ++;
+        }
+    }
+    fin.close();
+
+    cout << nRows << " x " << nCols << endl;
+    if (nRows != inputData->GetNumberOfPoints()) {
+        cout << "# of data is different from # of points." << endl;
+        return;
+    }
+
+
+    /// Optionally, compute vector stats
+    if (opts.GetBool("-computeVectorStats")) {
+        vtkDoubleArray* meanValues = vtkDoubleArray::New();
+        meanValues->SetName((attributeName + "_Avg").c_str());
+        meanValues->SetNumberOfValues(nRows);
+
+        vtkDoubleArray* stdValues = vtkDoubleArray::New();
+        stdValues->SetName((attributeName + "_Std").c_str());
+        stdValues->SetNumberOfValues(nRows);
+
+        for (int i = 0; i < nRows; i++) {
+            vector<double> values(nCols);
+            vectorArray->GetTuple(i, &values[0]);
+            MeanStd<double> meanStd;
+            meanStd = for_each(values.begin(), values.end(), meanStd);
+
+            meanValues->SetValue(i, meanStd.mean());
+            stdValues->SetValue(i, meanStd.std());
+        }
+
+        inputData->GetPointData()->AddArray(meanValues);
+        inputData->GetPointData()->AddArray(stdValues);
+    }
+
+    inputData->GetPointData()->AddArray(vectorArray);
+    vio.writeFile(outputDataFile, inputData);
+}
+
+
+/// @brief Export vector values
+void runExportVectors(Options& opts, StringVector& args) {
+    string inputDataFile = args[0];
+    string vectorDataFile = args[1];
+
+    vtkIO vio;
+    vtkPolyData* inputData = vio.readFile(inputDataFile);
+
+    int nArr = inputData->GetPointData()->GetNumberOfArrays();
+    vtkDataArray* vectorArray = NULL;
+
+    for (int j = 0; j < nArr; j++) {
+        if (opts.GetString("-scalarName", "VectorValues") == inputData->GetPointData()->GetArrayName(j)) {
+            vectorArray = inputData->GetPointData()->GetArray(j);
+            break;
+        }
+    }
+
+    if (vectorArray == NULL) {
+        cout << "Can't find the vector values : " << opts.GetString("-scalarName", "VectorValues") << endl;
+        return;
+    }
+
+    const int nCols = vectorArray->GetNumberOfComponents();
+    const int nRows = vectorArray->GetNumberOfTuples();
+
+    ofstream out(vectorDataFile.c_str());
+    std::vector<double> row;
+    row.resize(nCols);
+    for (int i = 0; i < nRows; i++) {
+        vectorArray->GetTuple(i, &row[0]);
+        for (int j = 0; j < nCols; j++) {
+            if (j > 0) {
+                out << "\t";
+            }
+            out << row[j];
+        }
+        out << endl;
+    }
+    out.close();
+
+    return;
 }
 
 
@@ -777,6 +1013,28 @@ void runFilterStream(Options& opts, StringVector& args) {
     vio.writeFile(outputStreamFile, outputStream);
 }
 
+/// @brief Rescale the streamline with a given length
+void runRescaleStream(Options& opts, StringVector& args) {
+    string inputStreamFile = args[0];
+    string inputDataFile = args[1];
+    string scalarName = opts.GetString("-scalarName");
+
+    vtkIO vio;
+    vtkPolyData* inputStream = vio.readFile(inputStreamFile);
+    vtkPolyData* inputData = vio.readFile(inputDataFile);
+    vtkDataArray* inputScalars = inputData->GetPointData()->GetScalars(scalarName.c_str());
+
+    for (int i = 0; i < inputStream->GetNumberOfLines(); i++) {
+        double length = inputScalars->GetTuple1(i);
+        vtkPolyLine* line = vtkPolyLine::SafeDownCast(inputStream->GetCell(i));
+        if (line == NULL) {
+            vtkLine* aline = vtkLine::SafeDownCast(inputStream->GetCell(i));
+        } else {
+            // reduce length
+        }
+    }
+}
+
 
 /// @brief Fit a model into a binary image
 void runFittingModel(Options& opts, StringVector& args) {
@@ -932,7 +1190,7 @@ void runSampleImage(Options& opts, StringVector& args) {
     ImageInterpolatorType::Pointer interp = ImageInterpolatorType::New();
     interp->SetInputImage(inputImage);
 
-    cout << "Building a image data ..." << flush;
+    cout << "Building an image data for sampling ..." << flush;
     /// Create a vtu image
     /// - Create an instance for the output grid
     vtkUnstructuredGrid* imageData = vtkUnstructuredGrid::New();
@@ -967,7 +1225,10 @@ void runSampleImage(Options& opts, StringVector& args) {
 
     cout << " done" << endl;
 
-    /// FIXME: The number of points of the input should be greater than 0.
+    if (pointSet->GetNumberOfPoints() < 1) {
+        cout << "# of points should be greater than 0" << endl;
+        return;
+    }
     vtkKdTreePointLocator* locator = vtkKdTreePointLocator::New();
     locator->SetDataSet(imageData);
     locator->BuildLocator();
@@ -1282,33 +1543,709 @@ int runScanConversion(pi::Options& opts, pi::StringVector& args) {
 }
 
 
+
+/// @brief Run PCA analysis
+void runPCA(Options& opts, StringVector& args) {
+    vtkIO vio;
+    std::vector<vtkPolyData*> inputs;
+    inputs.resize(args.size());
+    /// - Read a series of vtk files
+    for (int i = 0; i < args.size(); i++) {
+        inputs[i] = vio.readFile(args[i]);
+    }
+
+    vtkPCAAnalysisFilter* pcaFilter = vtkPCAAnalysisFilter::New();
+    pcaFilter->SetNumberOfInputs(args.size());
+    for (int i = 0; i < args.size(); i++) {
+        pcaFilter->SetInput(i, inputs[i]);
+    }
+    pcaFilter->Update();
+    vtkFloatArray* eigenValues = pcaFilter->GetEvals();
+    for (int i = 0; i < eigenValues->GetNumberOfTuples(); i++) {
+        cout << eigenValues->GetValue(i) << endl;
+    }
+
+    if (opts.GetString("-pcaMeanOut") != "") {
+        vtkFloatArray* array = vtkFloatArray::New();
+        pcaFilter->GetParameterisedShape(array, inputs[0]);
+        vio.writeFile(opts.GetString("-pcaMeanOut"), inputs[0]);
+    }
+}
+
+/// @brief Perform Procrustes alignment
+void runProcrustes(Options& opts, StringVector& args) {
+    int nInputs = args.size() / 2;
+
+    vtkIO vio;
+    vtkProcrustesAlignmentFilter* pros = vtkProcrustesAlignmentFilter::New();
+    pros->SetNumberOfInputs(nInputs);
+    for (int i = 0; i < nInputs; i++) {
+        pros->SetInput(i, vio.readFile(args[i]));
+    }
+    pros->GetLandmarkTransform()->SetModeToSimilarity();
+    pros->Update();
+
+    for (int i = nInputs; i < args.size(); i++) {
+        vio.writeFile(args[i], pros->GetOutput(i-nInputs));
+    }
+
+}
+
+
+static bool sortSecond(const std::pair<int,double> &left, const std::pair<int,double> &right) {
+    return left.second > right.second;
+}
+
+
+
+/// @brief Perform extraction of regions based on scalars. First, threshold with scalars.
+/// Second, compute the connected components. Third, compute the area of each region.
+/// Fourth, threshold each region with the computed area, exclude below 20%.
+void runConnectScalars(Options& opts, StringVector& args) {
+    string inputFile = args[0];
+    string scalarName = opts.GetString("-scalarName");
+
+    vtkIO vio;
+    vtkPolyData* inputData = vio.readFile(inputFile.c_str());
+
+    const int nPoints = inputData->GetNumberOfPoints();
+    const double tmin = opts.GetStringAsReal("-thresholdMin", itk::NumericTraits<double>::min());
+    const double tmax = opts.GetStringAsReal("-thresholdMax", itk::NumericTraits<double>::max());
+
+    inputData->GetPointData()->SetScalars(inputData->GetPointData()->GetScalars(scalarName.c_str()));
+
+    vtkIntArray* originalIds = vtkIntArray::New();
+    originalIds->SetName("OriginalId");
+    for (int i = 0; i < nPoints; i++) {
+        originalIds->InsertNextValue(i);
+    }
+    inputData->GetPointData()->AddArray(originalIds);
+
+    vtkThreshold* threshold = vtkThreshold::New();
+    threshold->SetInput(inputData);
+    threshold->ThresholdBetween(tmin, tmax);
+    threshold->Update();
+
+    vtkConnectivityFilter* conn = vtkConnectivityFilter::New();
+    conn->SetInputConnection(threshold->GetOutputPort());
+    conn->ColorRegionsOn();
+    conn->SetExtractionModeToAllRegions();
+    conn->Update();
+
+    vtkUnstructuredGrid* connComp = conn->GetOutput();
+    int nCells = connComp->GetNumberOfCells();
+
+    vtkDataArray* regionIds = connComp->GetCellData()->GetScalars("RegionId");
+    double regionIdRange[2];
+    regionIds->GetRange(regionIdRange);
+    int maxId = regionIdRange[1];
+
+    /// Compute the area of each region
+    typedef std::pair<int, double> IntPair;
+    std::vector<IntPair> regionAreas;
+    regionAreas.resize(maxId + 1);
+    IntPair zero(0,0);
+    std::fill(regionAreas.begin(), regionAreas.end(), zero);
+
+    for (int i = 0; i < nCells; i++) {
+        vtkCell* cell = connComp->GetCell(i);
+        vtkTriangle* tri = vtkTriangle::SafeDownCast(cell);
+        if (tri == NULL) {
+            cout << "Non-triangle cell" << endl;
+            continue;
+        }
+        double area = tri->ComputeArea();
+        regionAreas[regionIds->GetTuple1(i)].first = regionIds->GetTuple1(i);
+        regionAreas[regionIds->GetTuple1(i)].second += area;
+    }
+
+    /// Propagate areas to each cell
+    vtkDoubleArray* cellArea = vtkDoubleArray::New();
+    cellArea->SetName("RegionArea");
+    cellArea->SetNumberOfTuples(nCells);
+
+    for (int i = 0; i < nCells; i++) {
+        int regionId = regionIds->GetTuple1(i);
+        cellArea->SetTuple1(i, regionAreas[regionId].second);
+    }
+    connComp->GetCellData()->AddArray(cellArea);
+
+
+    std::sort(regionAreas.begin(), regionAreas.end(), sortSecond);
+    double totalArea = 0;
+    for (int i = 0; i < maxId; i++) {
+        totalArea += regionAreas[i].second;
+        cout << totalArea << endl;
+    }
+
+    /// Re-label regionIds in the decreasing order of its area
+    std::vector<int> regionRanking;
+    regionRanking.resize(regionAreas.size());
+
+    for (int i = 0; i < regionRanking.size(); i++) {
+        regionRanking[regionAreas[i].first] = (i+1);
+    }
+
+    /// Update region Ids for every cell
+    for (int i = 0; i < nCells; i++) {
+        int regionId = regionIds->GetTuple1(i);
+        regionIds->SetTuple1(i, regionRanking[regionId]);
+    }
+
+    /// Update the RegionId in point data
+    vtkDataArray* regionIds2 = connComp->GetPointData()->GetScalars("RegionId");
+    for (int i = 0; i < regionIds2->GetNumberOfTuples(); i++) {
+        int regionId = regionIds2->GetTuple1(i);
+        regionIds2->SetTuple1(i, regionRanking[regionId]);
+    }
+
+
+    /// Compute the 90% percentile
+    double totalPer = 0, areaMin = 0;
+    for (int i = 0; i < maxId; i++) {
+        totalPer += (regionAreas[i].second / totalArea);
+        if (totalPer > 0.90) {
+            areaMin = regionAreas[i].second;
+            break;
+        }
+    }
+
+    cout << "Minimum Region Area for 90%: " << areaMin << endl;
+
+    /// Threshold each cell with area
+    vtkThreshold* areaThresholder = vtkThreshold::New();
+    areaThresholder->SetInput(connComp);
+    areaThresholder->ThresholdByUpper(areaMin);
+    areaThresholder->SetInputArrayToProcess(0, 0, 0, vtkDataObject::FIELD_ASSOCIATION_CELLS, "RegionArea");
+    areaThresholder->Update();
+    vtkUnstructuredGrid* areaOutput = areaThresholder->GetOutput();
+
+
+
+    /// New RegonId array
+    vtkIntArray* pointRegionIds = vtkIntArray::New();
+    pointRegionIds->SetName("RegionIds");
+    pointRegionIds->SetNumberOfTuples(nPoints);
+    for (int i = 0; i < pointRegionIds->GetNumberOfTuples(); i++) {
+        pointRegionIds->SetTuple1(i, 0);
+    }
+
+    vtkDataArray* areaRegionIds = areaOutput->GetPointData()->GetScalars("RegionId");
+    vtkDataArray* pointIds = areaOutput->GetPointData()->GetScalars("OriginalId");
+    for (int i = 0; i < pointIds->GetNumberOfTuples(); i++) {
+        int ptid = pointIds->GetTuple1(i);
+        int regionId = areaRegionIds->GetTuple1(i);
+
+        pointRegionIds->SetTuple1(ptid, regionId);
+    }
+
+    inputData->GetPointData()->AddArray(pointRegionIds);
+    vio.writeFile(args[1], inputData);
+
+
+//    vtkDataArray* scalars = inputData->GetPointData()->GetScalars(scalarName.c_str());
+//    for (int i = 0; i < nPoints; i++) {
+//        double value = scalars->GetTuple1(i);
+//        if (value < tmin || value > tmax) {
+//            value = std::numeric_limits<double>::quiet_NaN();
+//        }
+//    }
+
+
+//    vtkPolyDataConnectivityFilter* conf = vtkPolyDataConnectivityFilter::New();
+//    conf->SetInput(inputData);
+//    conf->ScalarConnectivityOn();
+//    conf->SetExtractionModeToAllRegions();
+//    conf->FullScalarConnectivityOn();
+//    conf->ColorRegionsOn();
+//    conf->SetScalarRange(0, 0.05);
+//    conf->Update();
+
+//    vtkPolyData* output = conf->GetOutput();
+//    vio.writeFile(args[1], output);
+}
+
+
+
+/// @brief Find neighbors of a point
+void extractNeighbors(std::vector<int>& ids, vtkPolyData* data, std::set<int>& neighbors, int nRing) {
+    /// for every id in ids
+    for (int i = 0; i < ids.size(); i++) {
+        int id = ids[i];
+
+        /// if id is found in neighbors
+        if (neighbors.find(id) == neighbors.end()) {
+            /// add to neighbors
+            neighbors.insert(id);
+        }
+
+        if (nRing > 0) {
+            /// find every neighboring cells
+            vtkIdList* cellIds = vtkIdList::New();
+            data->GetPointCells(id, cellIds);
+
+
+            std::vector<int> idSet;
+            for (int j = 0; j < cellIds->GetNumberOfIds(); j++) {
+                const int cellId = cellIds->GetId(j);
+                vtkIdList* pointIds = vtkIdList::New();
+                data->GetCellPoints(cellId, pointIds);
+                for (int k = 0; k < pointIds->GetNumberOfIds(); k++) {
+                    int newId = pointIds->GetId(k);
+                    if (id == 110) {
+                        //                        cout << newId << endl;
+                    }
+                    /// if id is found in neighbors, proceed to next point
+                    if (neighbors.find(newId) == neighbors.end()) {
+                        idSet.push_back(newId);
+                    }
+                }
+                pointIds->Delete();
+            }
+            cellIds->Delete();
+
+            extractNeighbors(idSet, data, neighbors, nRing - 1);
+        }
+    }
+}
+
+
+/// @brief Perform correlation-based clustering
+void runCorrelationClustering(Options& opts, StringVector& args) {
+    string inputDataFile = args[0];
+    string inputVectorName = opts.GetString("-scalarName", "VectorValues");
+    string outputScalarName = opts.GetString("-outScalarName", "CorrClusters");
+    string outputDataFile = args[1];
+
+    vtkIO vio;
+    vtkPolyData* inputData = vio.readFile(inputDataFile);
+    const int nPoints = inputData->GetNumberOfPoints();
+
+    int nArr = inputData->GetPointData()->GetNumberOfArrays();
+    vtkDataArray* vectorArray = NULL;
+
+    for (int j = 0; j < nArr; j++) {
+        if (opts.GetString("-scalarName", "VectorValues") == inputData->GetPointData()->GetArrayName(j)) {
+            vectorArray = inputData->GetPointData()->GetArray(j);
+            break;
+        }
+    }
+
+    /// # of tuples
+    const int nCols = vectorArray->GetNumberOfComponents();
+
+    /// storage for vector data
+    std::vector<double> idata;
+    idata.resize(vectorArray->GetNumberOfComponents());
+
+    std::vector<double> jdata;
+    jdata.resize(vectorArray->GetNumberOfComponents());
+
+
+    /// Compute the mean and stdev for each vector
+    std::vector<double> dataMean, dataStd;
+    for (int i = 0; i < nPoints; i++) {
+        vectorArray->GetTuple(i, &idata[0]);
+        double sum = 0;
+        double sum2 = 0;
+        for (int j = 0; j < nCols; j++) {
+            double val = idata[j];
+            cout << val << "\t";
+            sum += val;
+            sum2 += val * val;
+        }
+        cout << endl;
+        double avg = sum / nCols;
+        double var = sum2/nCols - avg*avg;
+        double std = sqrt(var);
+
+        dataMean.push_back(avg);
+        dataStd.push_back(std);
+
+        cout << std << endl;
+    }
+
+
+
+    /// Iterate over all points and compute the maximum correlation between neighbors
+    vtkIntArray* maxCorrNeighbor = vtkIntArray::New();
+    maxCorrNeighbor->SetName("CorrNeighbors");
+    maxCorrNeighbor->SetNumberOfValues(nPoints);
+
+    for (int i = 0; i < nPoints; i++) {
+        // set up for neighbor finding
+        std::set<int> neighbors;
+        std::vector<int> ids;
+        ids.push_back(i);
+
+        vectorArray->GetTuple(i, &idata[0]);
+        double imean = dataMean[i];
+        double istd = dataStd[i];
+
+        extractNeighbors(ids, inputData, neighbors, 1);
+        std::set<int>::iterator iter = neighbors.begin();
+
+        int maxNeighbor = -1;
+        double maxCorr = -10;
+
+        for (; iter != neighbors.end(); iter++) {
+            int j = *iter;
+            if (j == i) {
+                continue;
+            }
+            vectorArray->GetTuple(j, &jdata[0]);
+
+            /// Compute the cross correlation
+            double jmean = dataMean[j];
+            double jstd = dataStd[j];
+
+            double corr = 0;
+            for (int k = 0; k < nCols; k++) {
+                corr += ((idata[k] - imean) * (jdata[k] - jmean));
+            }
+            corr /= (istd * jstd);
+//            cout << corr << ",";
+            if (corr > maxCorr) {
+                maxCorr = corr;
+                maxNeighbor = j;
+            }
+        }
+//        cout << endl;
+        maxCorrNeighbor->SetValue(i, maxNeighbor);
+    }
+
+    /// connected components with maxCorrNeighbors
+    /// Loop over all points and mark its region
+    /// If it encounters previously marked region, then stop and mark its region to the previous region
+    std::vector<int> markups;
+    markups.resize(nPoints);
+    std::fill(markups.begin(), markups.end(), -1);
+
+    std::vector<int> curRegion;
+
+    int regionCounter = 0;
+    for (int i = 0; i < nPoints; i++) {
+        bool cont = markups[i] < 0;
+        if (!cont) {
+            continue;
+        }
+
+        int j = i;
+
+        curRegion.clear();
+        curRegion.push_back(j);
+        while (true) {
+            j = maxCorrNeighbor->GetValue(j);
+            int jMark = markups[j];
+            cont = jMark < 0;
+            if (!cont && jMark == regionCounter) {
+                regionCounter++;
+                break;
+            } else if (!cont && jMark < regionCounter) {
+                // replace all regionCounter into jMark
+                for (int k = 0; k < curRegion.size(); k++) {
+                    markups[curRegion[k]] = jMark;
+                }
+                break;
+            } else {
+                markups[j] = regionCounter;
+            }
+            curRegion.push_back(j);
+        }
+    }
+
+    vtkIntArray* regionArray = vtkIntArray::New();
+    regionArray->SetName(outputScalarName.c_str());
+    regionArray->SetNumberOfValues(markups.size());
+    for (int i = 0; i < markups.size(); i++) {
+        regionArray->SetValue(i, markups[i]);
+    }
+    inputData->GetPointData()->AddArray(regionArray);
+    inputData->GetPointData()->AddArray(maxCorrNeighbor);
+    vio.writeFile(outputDataFile, inputData);
+}
+
+/// @brief perform ridge detection
+void runDetectRidge(Options& opts, StringVector& args) {
+    vtkIO vio;
+    string inputFile = args[0];
+    const int nRing = opts.GetStringAsInt("-n", 2);
+
+    vtkPolyData* inputData = vio.readFile(inputFile);
+    vtkPoints* inputPoints = inputData->GetPoints();
+    const int nPoints = inputData->GetNumberOfPoints();
+
+    vtkPolyDataNormals* normalFilter = vtkPolyDataNormals::New();
+    normalFilter->SetInput(inputData);
+    normalFilter->ComputePointNormalsOn();
+    normalFilter->ConsistencyOn();
+    normalFilter->GetAutoOrientNormals();
+    normalFilter->Update();
+    vtkFloatArray* normals = vtkFloatArray::SafeDownCast(normalFilter->GetOutput()->GetPointData()->GetScalars("Normals"));
+    if (normals == NULL) {
+        cout << "Can't compute point normals" << endl;
+        return;
+    }
+
+    cout << "# points: " << nPoints << endl;
+    cout << "# rings (neighbor degrees): " << nRing << endl;
+
+    vtkDoubleArray* gaussianCurv = vtkDoubleArray::New();
+    gaussianCurv->SetNumberOfTuples(nPoints);
+    gaussianCurv->SetName("GaussianCurvature");
+
+    vtkDoubleArray* e1 = vtkDoubleArray::New();
+    e1->SetNumberOfTuples(nPoints);
+    e1->SetName("CurvatureExtreme1");
+
+    vtkDoubleArray* e2 = vtkDoubleArray::New();
+    e2->SetNumberOfTuples(nPoints);
+    e2->SetName("CurvatureExtreme2");
+
+    vtkDoubleArray* shapeOperator = vtkDoubleArray::New();
+    shapeOperator->SetNumberOfComponents(3);
+    shapeOperator->SetNumberOfTuples(nPoints);
+    shapeOperator->SetName("ShapeOperator");
+
+    vtkDoubleArray* majorDirection = vtkDoubleArray::New();
+    majorDirection->SetNumberOfComponents(3);
+    majorDirection->SetNumberOfTuples(nPoints);
+    majorDirection->SetName("MajorDirection");
+
+    vtkDoubleArray* minorDirection = vtkDoubleArray::New();
+    minorDirection->SetNumberOfComponents(3);
+    minorDirection->SetNumberOfTuples(nPoints);
+    minorDirection->SetName("MinorDirection");
+
+    vtkDoubleArray* kappa1 = vtkDoubleArray::New();
+    kappa1->SetNumberOfComponents(1);
+    kappa1->SetNumberOfTuples(nPoints);
+    kappa1->SetName("Kappa1");
+
+    vtkDoubleArray* kappa2 = vtkDoubleArray::New();
+    kappa2->SetNumberOfComponents(1);
+    kappa2->SetNumberOfTuples(nPoints);
+    kappa2->SetName("Kappa2");
+
+
+    /// Loop over all points
+
+    for (int i = 0; i < nPoints; i++) {
+        /// Find the center
+        double x[3];
+        inputPoints->GetPoint(i, x);
+
+        /// Extract neighbor points
+        std::set<int> neighbors;
+        std::vector<int> ids;
+        ids.push_back(i);
+        extractNeighbors(ids, inputData, neighbors, nRing);
+
+
+        /// Compute the point normal
+        double normal[3];
+        normals->GetTuple(i, normal);
+
+        /// Compute the rotation matrix
+        const double northPole[3] = { 0, 0, 1 };
+
+        vnl_matrix<double> rotation(3,3);
+        vio.rotateVector(normal, northPole, rotation);
+
+        int nNeighbors = neighbors.size();
+
+        vnl_matrix<double> U(3*nNeighbors, 7);
+        vnl_vector<double> d(3*nNeighbors);
+
+        std::set<int>::iterator iter = neighbors.begin();
+        for (int j = 0; iter != neighbors.end(); j++, iter++) {
+            int nbrId = *iter;
+            double p[3];
+
+            inputPoints->GetPoint(nbrId, p);
+
+            vnl_vector<double> px(3), pn(3);
+            vtkMath::Subtract(p, x, px.data_block());
+            normals->GetTuple(nbrId, pn.data_block());
+
+            /// Rotate the neighbor to the north pole
+            vnl_vector<double> q = rotation * px;
+            vnl_vector<double> qn = rotation * pn;
+
+//            double k2 = sqrt(2/q[0]*q[0] + q[1]*q[1]);
+//
+//            if (isnan(k2)) {
+//                k2 = 0;
+//            }
+//
+//            q[0] *= k2;
+//            q[1] *= k2;
+//            q[2] *= k2;
+
+            U[3*j][0] = 0.5 * q[0]*q[0];
+            U[3*j][1] = q[0]*q[1];
+            U[3*j][2] = 0.5 * q[1]*q[1];
+            U[3*j][3] = q[0]*q[0]*q[0];
+            U[3*j][4] = q[0]*q[0]*q[1];
+            U[3*j][5] = q[0]*q[1]*q[1];
+            U[3*j][6] = q[1]*q[1]*q[1];
+            d[3*j] = q[2];
+
+            U[3*j+1][0] = q[0];
+            U[3*j+1][1] = q[1];
+            U[3*j+1][2] = 0;
+            U[3*j+1][3] = 3*q[0]*q[0];
+            U[3*j+1][4] = 2*q[0]*q[1];
+            U[3*j+1][5] = q[1]*q[1];
+            U[3*j+1][6] = 0;
+
+            if (qn[2] == 0) {
+                d[3*j+1] = 0;
+            } else {
+                d[3*j+1] = -qn[0] / qn[2];
+            }
+
+            U[3*j+2][0] = 0;
+            U[3*j+2][1] = q[0];
+            U[3*j+2][2] = q[1];
+            U[3*j+2][3] = 0;
+            U[3*j+2][4] = q[0]*q[0];
+            U[3*j+2][5] = 2*q[0]*q[1];
+            U[3*j+2][6] = 3*q[1]*q[1];
+
+            if (qn[2] == 0) {
+                d[3*j+2] = 0;
+            } else {
+                d[3*j+2] = -qn[1] / qn[2];
+            }
+        }
+
+        vnl_matrix_inverse<double> Uinv(U);
+        vnl_vector<double> coeff = Uinv.pinverse() * d;
+        vnl_matrix<double> W(2,2);
+
+        W[0][0] = coeff[0];
+        W[0][1] = W[1][0] = coeff[1];
+        W[1][1] = coeff[2];
+
+        vnl_symmetric_eigensystem<double> Weigen(W);
+
+
+        double k1 = Weigen.get_eigenvalue(1);
+        double k2 = Weigen.get_eigenvalue(0);
+        double gk = k1 * k2;
+
+        double e[2] = { 0, 0 };
+        for (int k = 0; k < 2; k++) {
+            double t1 = Weigen.get_eigenvector(k)[1];
+            double t2 = Weigen.get_eigenvector(k)[0];
+            e[k] = t1*(t1*t1*coeff[3] + t2*t2*coeff[5]/3.0) + t2*(t1*t1*coeff[4]/3.0 + t2*t2*coeff[6]);
+        }
+        e[0] = e[0]*e[0] + e[1]*e[1];
+//        cout << e[0] << "," << e[1] << endl;
+
+        kappa1->SetValue(i, k1);
+        kappa2->SetValue(i, k2);
+
+        vnl_matrix<double> rotation_inv = rotation.transpose();
+        vnl_vector<double> majorDir(3);
+        majorDir[0] = Weigen.get_eigenvector(1)[0];
+        majorDir[1] = Weigen.get_eigenvector(1)[1];
+        majorDir[2] = 0;
+        majorDir = rotation_inv * majorDir;
+
+        vnl_vector<double> minorDir(3);
+        minorDir[0] = Weigen.get_eigenvector(0)[0];
+        minorDir[1] = Weigen.get_eigenvector(0)[1];
+        minorDir[2] = 0;
+        minorDir = rotation_inv * minorDir;
+
+
+//        cout << k1 << "," << k2 << endl;
+//        cout << Weigen.get_eigenvector(1) << " => " << majorDir << ";" << endl;
+//        cout << Weigen.get_eigenvector(0) << " => " << minorDir << ";" << endl;
+
+        majorDirection->SetTuple(i, majorDir.data_block());
+        minorDirection->SetTuple(i, minorDir.data_block());
+
+        gaussianCurv->SetValue(i, gk);
+        shapeOperator->SetTuple3(i, W[0][0], W[0][1], W[1][1]);
+        e1->SetValue(i, e[0]);
+        e2->SetValue(i, e[1]);
+    }
+
+    inputData->GetPointData()->AddArray(gaussianCurv);
+    inputData->GetPointData()->AddArray(shapeOperator);
+    inputData->GetPointData()->AddArray(e1);
+    inputData->GetPointData()->AddArray(e2);
+    inputData->GetPointData()->AddArray(kappa1);
+    inputData->GetPointData()->AddArray(kappa2);
+    inputData->GetPointData()->AddArray(majorDirection);
+    inputData->GetPointData()->AddArray(minorDirection);
+
+    vio.writeFile(args[1], inputData);
+}
+
+
+/// @brief run a test code
+void runTest(Options& opts, StringVector& args) {
+    vtkIO io;
+
+    double v1[3] = {0, 0, 5 };
+    double v2[3] = { 0, 1, 0 };
+    vnl_matrix<double> rotation;
+
+    io.rotateVector(v1, v2, rotation);
+
+    vnl_vector<double> vv(3);
+    vv.set_size(3);
+    vv.copy_in(v1);
+    cout << vv << endl;
+    cout << rotation << endl;
+    cout << rotation * vv << endl;
+}
+
 int main(int argc, char * argv[])
 {
     Options opts;
     // general options
     opts.addOption("-o", "Specify a filename for output; used with other options", "-o filename.nrrd", SO_REQ_SEP);
+    opts.addOption("-n", "Specify n (integer number) for an operation. Refer related options", "-n integer",SO_REQ_SEP);
     opts.addOption("-scalarName", "scalar name [string]", SO_REQ_SEP);
     opts.addOption("-outputScalarName", "scalar name for output [string]", SO_REQ_SEP);
     opts.addOption("-sigma", "sigma value [double]", SO_REQ_SEP);
     opts.addOption("-threshold", "Threshold value [double]", SO_REQ_SEP);
     opts.addOption("-iter", "number of iterations [int]", SO_REQ_SEP);
     opts.addOption("-attrDim", "The number of components of attribute", "-attrDim 3 (vector)", SO_REQ_SEP);
+    opts.addOption("-thresholdMin", "Give a minimum threshold value for -filterStream, -connectScalars", "-thresholdMin 10 (select a cell whose attriubte is greater than 10)", SO_REQ_SEP);
+    opts.addOption("-thresholdMax", "Give a maximum threshold value for -filterStream -connectScalars", "-thresholdMax 10 (select a cell whose attriubte is lower than 10)", SO_REQ_SEP);
+    opts.addOption("-test", "Run test code", SO_NONE);
 
     // scalar array handling
     opts.addOption("-exportScalars", "Export scalar values to a text file", "-exportScalars [in-mesh] [scalar.txt]", SO_NONE);
     opts.addOption("-importScalars", "Add scalar values to a mesh [in-mesh] [scalar.txt] [out-mesh]", SO_NONE);
     opts.addOption("-smoothScalars", "Gaussian smoothing of scalar values of a mesh. [in-mesh] [out-mesh]", SO_NONE);
+    opts.addOption("-importVectors", "Add vector values to a mesh [in-mesh] [scalar.txt] [out-mesh] [-computeVectorStats]", SO_NONE);
+    opts.addOption("-exportVectors", "Export vector values to a mesh [in-mesh] [scalar.txt]", SO_NONE);
+    opts.addOption("-computeVectorStats", "Compute mean and std for a vector attribute", "-importVectors ... [-computeVectorStats]", SO_NONE);
+
     opts.addOption("-copyScalars", "Copy a scalar array of the input model to the output model", "-copyScalars input-model1 input-model2 output-model -scalarName name", SO_NONE);
     opts.addOption("-averageScalars", "Compute the average of scalars across given inputs", "-averageScalars -o output-vtk input1-vtk input2-vtk ... ", SO_NONE);
+    opts.addOption("-connectScalars", "Compute the connected components based on scalars and assign region ids", "-connectScalars input.vtk output.vtk -scalarName scalar -thresholdMin min -thresholdMax max", SO_NONE);
+    opts.addOption("-corrClustering", "Compute correlational clusters -corrClustering input-vtk -scalarName values-to-compute-correlation -outScalarName clusterId", SO_NONE);
 
     // sampling from an image
     opts.addOption("-sampleImage", "Sample pixels for each point of a given model. Currently, only supported image type is a scalar", "-sampleImage image.nrrd model.vtp output.vtp -outputScalarName scalarName", SO_NONE);
     opts.addOption("-voronoiImage", "Compute the voronoi image from a given data set. A reference image should be given.", "-voronoiImage ref-image.nrrd input-dataset output-image.nrrd -scalarName voxelLabel", SO_NONE);
     opts.addOption("-scanConversion", "Compute a binary image from a surface model", "-scanConversion input-surface input-image.nrrd output-image.nrrd", SO_NONE);
 
+
     // mesh processing
     opts.addOption("-appendData", "Append input meshes into a single data [output-mesh]", SO_REQ_SEP);
     opts.addOption("-computeCurvature", "Compute curvature values for each point", "-computeCurvature input-vtk output-vtk", SO_NONE);
+    opts.addOption("-pca", "Perform PCA analysis", "-pca input1-vtk input2-vtk ... -o output.txt", SO_NONE);
+    opts.addOption("-pcaMeanOut", "A filename for PCA mean output", "-pca ... -pcaMeanOut file.vtk", SO_REQ_SEP);
+    opts.addOption("-procrustes", "Perform Procrustes alignment", "-procrustes input1.vtk input2.vtk ... output1.vtk output2.vtk ...", SO_NONE);
 
     opts.addOption("-vti", "Convert an ITK image to VTI format (VTKImageData)", "-vti imageFile outputFile [-attrDim 3] [-maskImage mask]", SO_NONE);
     opts.addOption("-vtu", "Convert an ITK image to VTU format (vtkUnstructuredGrid). This is useful when masking is needed.", "-vtu imageFile outputFile -maskImage maskImage", SO_NONE);
@@ -1318,9 +2255,16 @@ int main(int argc, char * argv[])
     opts.addOption("-zrotate", "Rotate all the points along the z-axis. Change the sign of x and y coordinate.", "-traceStream ... -zrotate", SO_NONE);
     opts.addOption("-traceClipping", "Clip stream lines to fit with an object", "-traceClipping stream_lines.vtp stream_object.vtp stream_lines_output.vtp", SO_NONE);
     opts.addOption("-traceScalarCombine", "Combine scalar values from a seed object to a stream line object. The stream line object must have PointIds for association. -zrotate option will produce the rotated output.", "-traceScalarCombine stream_seed.vtp stream_lines.vtp stream_lines_output.vtp -scalarName scalarToBeCopied", SO_NONE);
+    opts.addOption("-rescaleStream", "Rescale streamlines to fit with given lengths", "-rescaleStream input-stream-lines length.txt or input.vtp -scalarName scalarname", SO_NONE);
+
+
+    /// Compute SPHARM smoothing
+    opts.addOption("-spharmCoeff", "Compute SPHARM coefficients", "-spharmCoeff input-vtk output-txt -scalarName scalarValueToEvaluate", SO_NONE);
+
+    /// Mesh operation
+    opts.addOption("-detectRidge", "Run ridge detection", "-n nRings -detectRidge input.vtk output.vtk", SO_NONE);
+
     opts.addOption("-filterStream", "Filter out stream lines which are lower than a given threshold", "-filterStream stream-line-input stream-seed-input stream-line-output -scalarName scalar -threshold xx", SO_NONE);
-    opts.addOption("-thresholdMin", "Give a minimum threshold value for -filterStream", "-threshold 10 (select a cell whose attriubte is greater than 10)", SO_REQ_SEP);
-    opts.addOption("-thresholdMax", "Give a maximum threshold value for -filterStream", "-threshold 10 (select a cell whose attriubte is lower than 10)", SO_REQ_SEP);
     opts.addOption("-fitting", "Fit a model into a binary image", "-fitting input-model binary-image output-model", SO_NONE);
     opts.addOption("-ellipse", "Create an ellipse with parameters []", "-ellipse 101 101 101 51 51 51 20 20 20 -o ellipse.nrrd", SO_NONE);
 
@@ -1338,10 +2282,18 @@ int main(int argc, char * argv[])
         runImportScalars(opts, args);
     } else if (opts.GetBool("-exportScalars")) {
         runExportScalars(opts, args);
+    } else if (opts.GetBool("-importVectors")) {
+        runImportVectors(opts, args);
+    } else if (opts.GetBool("-exportVectors")) {
+        runExportVectors(opts, args);
     } else if (opts.GetBool("-copyScalars")) {
         runCopyScalars(opts, args);
     } else if (opts.GetBool("-averageScalars")) {
         runAverageScalars(opts, args);
+    } else if (opts.GetBool("-connectScalars")) {
+        runConnectScalars(opts, args);
+    } else if (opts.GetBool("-corrClustering")) {
+        runCorrelationClustering(opts, args);
     } else if (opts.GetString("-appendData", "") != "") {
         runAppendData(opts, args);
     } else if (opts.GetBool("-sampleImage")) {
@@ -1358,6 +2310,8 @@ int main(int argc, char * argv[])
         runStreamTracer(opts, args);
     } else if (opts.GetBool("-filterStream")) {
         runFilterStream(opts, args);
+    } else if (opts.GetBool("-rescaleStream")) {
+        runRescaleStream(opts, args);
     } else if (opts.GetBool("-fitting")) {
         runFittingModel(opts, args);
     } else if (opts.GetBool("-ellipse")) {
@@ -1368,6 +2322,16 @@ int main(int argc, char * argv[])
         runComputeCurvature(opts, args);
     } else if (opts.GetBool("-traceScalarCombine")) {
         runTraceScalarCombine(opts, args);
+    } else if (opts.GetBool("-pca")) {
+        runPCA(opts, args);
+    } else if (opts.GetBool("-procrustes")) {
+        runProcrustes(opts, args);
+    } else if (opts.GetBool("-spharmCoeff")) {
+        runSPHARMCoeff(opts, args);
+    } else if (opts.GetBool("-detectRidge")) {
+        runDetectRidge(opts, args);
+    } else if (opts.GetBool("-test")) {
+        runTest(opts, args);
     }
     return 0;
 }

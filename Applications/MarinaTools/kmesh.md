@@ -2,6 +2,9 @@
 * -o
 	* Specify a filename for output; used with other options
 	* *ex)* -o filename.nrrd
+* -n
+	* Specify n (integer number) for an operation. Refer related options
+	* *ex)* -n integer
 * -scalarName
 	* scalar name [string]
 * -outputScalarName
@@ -15,6 +18,14 @@
 * -attrDim
 	* The number of components of attribute
 	* *ex)* -attrDim 3 (vector)
+* -thresholdMin
+	* Give a minimum threshold value for -filterStream, -connectScalars
+	* *ex)* -thresholdMin 10 (select a cell whose attriubte is greater than 10)
+* -thresholdMax
+	* Give a maximum threshold value for -filterStream -connectScalars
+	* *ex)* -thresholdMax 10 (select a cell whose attriubte is lower than 10)
+* -test
+	* Run test code
 * -exportScalars
 	* Export scalar values to a text file
 	* *ex)* -exportScalars [in-mesh] [scalar.txt]
@@ -22,12 +33,24 @@
 	* Add scalar values to a mesh [in-mesh] [scalar.txt] [out-mesh]
 * -smoothScalars
 	* Gaussian smoothing of scalar values of a mesh. [in-mesh] [out-mesh]
+* -importVectors
+	* Add vector values to a mesh [in-mesh] [scalar.txt] [out-mesh] [-computeVectorStats]
+* -exportVectors
+	* Export vector values to a mesh [in-mesh] [scalar.txt]
+* -computeVectorStats
+	* Compute mean and std for a vector attribute
+	* *ex)* -importVectors ... [-computeVectorStats]
 * -copyScalars
 	* Copy a scalar array of the input model to the output model
 	* *ex)* -copyScalars input-model1 input-model2 output-model -scalarName name
 * -averageScalars
 	* Compute the average of scalars across given inputs
 	* *ex)* -averageScalars -o output-vtk input1-vtk input2-vtk ... 
+* -connectScalars
+	* Compute the connected components based on scalars and assign region ids
+	* *ex)* -connectScalars input.vtk output.vtk -scalarName scalar -thresholdMin min -thresholdMax max
+* -corrClustering
+	* Compute correlational clusters -corrClustering input-vtk -scalarName values-to-compute-correlation -outScalarName clusterId
 * -sampleImage
 	* Sample pixels for each point of a given model. Currently, only supported image type is a scalar
 	* *ex)* -sampleImage image.nrrd model.vtp output.vtp -outputScalarName scalarName
@@ -42,6 +65,15 @@
 * -computeCurvature
 	* Compute curvature values for each point
 	* *ex)* -computeCurvature input-vtk output-vtk
+* -pca
+	* Perform PCA analysis
+	* *ex)* -pca input1-vtk input2-vtk ... -o output.txt
+* -pcaMeanOut
+	* A filename for PCA mean output
+	* *ex)* -pca ... -pcaMeanOut file.vtk
+* -procrustes
+	* Perform Procrustes alignment
+	* *ex)* -procrustes input1.vtk input2.vtk ... output1.vtk output2.vtk ...
 * -vti
 	* Convert an ITK image to VTI format (VTKImageData)
 	* *ex)* -vti imageFile outputFile [-attrDim 3] [-maskImage mask]
@@ -66,15 +98,18 @@
 * -traceScalarCombine
 	* Combine scalar values from a seed object to a stream line object. The stream line object must have PointIds for association. -zrotate option will produce the rotated output.
 	* *ex)* -traceScalarCombine stream_seed.vtp stream_lines.vtp stream_lines_output.vtp -scalarName scalarToBeCopied
+* -rescaleStream
+	* Rescale streamlines to fit with given lengths
+	* *ex)* -rescaleStream input-stream-lines length.txt or input.vtp -scalarName scalarname
+* -spharmCoeff
+	* Compute SPHARM coefficients
+	* *ex)* -spharmCoeff input-vtk output-txt -scalarName scalarValueToEvaluate
+* -detectRidge
+	* Run ridge detection
+	* *ex)* -n nRings -detectRidge input.vtk output.vtk
 * -filterStream
 	* Filter out stream lines which are lower than a given threshold
 	* *ex)* -filterStream stream-line-input stream-seed-input stream-line-output -scalarName scalar -threshold xx
-* -thresholdMin
-	* Give a minimum threshold value for -filterStream
-	* *ex)* -threshold 10 (select a cell whose attriubte is greater than 10)
-* -thresholdMax
-	* Give a maximum threshold value for -filterStream
-	* *ex)* -threshold 10 (select a cell whose attriubte is lower than 10)
 * -fitting
 	* Fit a model into a binary image
 	* *ex)* -fitting input-model binary-image output-model

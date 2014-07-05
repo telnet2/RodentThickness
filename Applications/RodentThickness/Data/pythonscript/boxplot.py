@@ -10,23 +10,17 @@ from optparse import OptionParser
 parser = OptionParser(usage="draw boxplot")
 parser.add_option("-1", "--label1", help="name for legend1", dest="label1", default="RPV3C")
 parser.add_option("-2", "--label2", help="name for legend2", dest="label2", default="RPV3E")
+parser.add_option("-s", "--show", help="show the graph", dest="show", action="store_true")
 
 
 (opts, args) = parser.parse_args()
 
 
-print args[0], args[1]
-
 g1 = glob.glob(args[0])
 g2 = glob.glob(args[1])
 
-
-print g1
-print g2
-
-
 # function for setting the colors of the box plots pairs
-spacing = 7
+spacing = 17
 
 def setBoxColors(bp):
     setp(bp['boxes'][0], color='blue')
@@ -49,7 +43,7 @@ def setBoxColors(bp):
 
 # Some fake data to plot
 
-fig = figure()
+fig = figure(figsize=(11,6))
 ax = axes()
 hold(True)
 
@@ -106,5 +100,6 @@ hB.set_visible(False)
 hR.set_visible(False)
 
 savefig(args[2])
-#show()
+if (opts.show):
+  show()
 
