@@ -4,6 +4,7 @@
 from optparse import OptionParser
 import csv
 import os,os.path,re,sys
+import system
 
 
 '''
@@ -135,16 +136,16 @@ def performAnalysis(cvsdata, config, outputDir, opt="initial_dense"):
     useStreamLine = True and opt == "spharm_sampling"
     if (not useStreamLine):
       exeCmd = "%s -sampleImage %s %s %s -outputScalarName Thickness -zrotate" % (pathKmesh, inputMeasurement, inputMesh, samplingMeshOutput)
-      os.system(exeCmd)
+      system.run_process(exeCmd,verbose=True)
 
       exeCmd = "%s -smoothScalars %s %s -scalarName Thickness -outputScalarName smoothThickness -iter 3" % (pathKmesh, samplingMeshOutput, samplingMeshOutput)
-      os.system(exeCmd)
+      system.run_process(exeCmd,verbose=True)
 
       exeCmd = "%s -exportScalars %s %s -scalarName Thickness " % (pathKmesh, samplingMeshOutput, samplingTxt)
-      os.system(exeCmd)
+      system.run_process(exeCmd,verbose=True)
 
       exeCmd = "%s -exportScalars %s %s -scalarName smoothThickness " % (pathKmesh, samplingMeshOutput, smoothSamplingTxt)
-      os.system(exeCmd)
+      system.run_process(exeCmd,verbose=True)
     else:
       gradientFile = "%s/Processing/1.MeasurementandSPHARM/%s/laplacianGradient.nrrd" % (outputDir, id)
       gradientVTIFile = "%s/Processing/1.MeasurementandSPHARM/%s/laplacianGradient.vti" % (outputDir, id)
@@ -152,15 +153,15 @@ def performAnalysis(cvsdata, config, outputDir, opt="initial_dense"):
 
       # vti image creation
       exeCmd = "%s -vti %s %s -attrDim 3" % (pathKmesh, gradientFile, gradientVTIFile)
-      os.system(exeCmd)
+      system.run_process(exeCmd,verbose=True)
 
       # RK45 integration
       exeCmd = "%s -traceStream %s %s %s %s -zrotate -traceDirection backward" % (pathKmesh, gradientVTIFile, inputMesh, streamLineFile, samplingMeshOutput)
-      os.system(exeCmd)
+      system.run_process(exeCmd,verbose=True)
 
       # scalar export
       exeCmd = "%s -exportScalars %s %s -scalarName Length " % (pathKmesh, samplingMeshOutput, smoothSamplingTxt)
-      os.system(exeCmd)
+      system.run_process(exeCmd,verbose=True)
 
 
 
@@ -248,36 +249,38 @@ def performAnalysis(cvsdata, config, outputDir, opt="initial_dense"):
     # compute per-group statistics
     cmd = "%s -computeVectorStats -scalarName %s -importVectors %s %s %s/%s_thickness.vtk" % (pathKmesh, group + "_Thickness", inputVTK, file, statDir, group)
     print cmd
-    os.system(cmd)
+    system.run_process(cmd,verbose=True)
 
 
   if (len(datafiles) > 1):
     runCmd = "%s %s %s %s %s" % (rscriptExePath, rscriptPath, datafilelist, outputfile, datagroups)
-    os.system(runCmd)
+    system.run_process(runCmd,verbose=True)
     visCmd = "%s %s %s %s -i %s -t" % (pythonPath, pythonScriptPath, inputVTK, outputVTK, outputfile)
-    os.system(visCmd)
+    system.run_process(visCmd,verbose=True)
 
     # connected components for p-value
     print "computing connected components with t.pvalue..."
     runCmd = "%s -connectScalars %s -scalarName t.pvalue %s -thresholdMin 0 -thresholdMax 0.05" % (pathKmesh, outputVTK, outputVTK)
-    os.system(runCmd)
+    system.run_process(runCmd,verbose=True)
 
     print "export scalars..."
     runCmd = "%s -exportScalars -scalarName RegionIds %s %s/regionIds.txt" % (pathKmesh, outputVTK, statDir)
-    os.system(runCmd)
+    system.run_process(runCmd,verbose=True)
 
     # create a combined data file with regions
-    for (group, file) in datafiles:
-      dataregionfilename = "%s/data_region%s_%s.txt" % (statDir, tag, group)
-      concatColumnsToFile(["%s/regionIds.txt" % (statDir), "%s/data%s_%s.txt" % (statDir, tag, group)], dataregionfilename, inputIsList = True)
-      # perform splitting
-      performSplit([dataregionfilename], "%s/data_%s_region_" % (statDir, group) + "%02d.txt")
+    regionIdFile = "%s/regionIds.txt" % (statDir)
+    if os.path.exists(regionIdFile):
+      for (group, file) in datafiles:
+        dataregionfilename = "%s/data_region%s_%s.txt" % (statDir, tag, group)
+        concatColumnsToFile([regionIdFile, "%s/data%s_%s.txt" % (statDir, tag, group)], dataregionfilename, inputIsList = True)
+        # perform splitting
+        performSplit([dataregionfilename], "%s/data_%s_region_" % (statDir, group) + "%02d.txt")
 
-    # boxplot
-    groupList = list(groupSet)
-    runCmd = "%s %s '%s' '%s' %s/%s_%s_regions.pdf --label1 %s --label2 %s" % (pythonPath, pythonScriptPath.replace("vtkPointAttributes.py", "boxplot.py"), "%s/data_%s_region_*.txt" % (statDir, groupList[0]), "%s/data_%s_region_*.txt" % (statDir, groupList[1]), statDir, groupList[0], groupList[1], groupList[0], groupList[1])
-    print runCmd
-    os.system(runCmd)
+      # boxplot
+      groupList = list(groupSet)
+      runCmd = "%s %s '%s' '%s' %s/%s_%s_regions.pdf --label1 %s --label2 %s" % (pythonPath, pythonScriptPath.replace("vtkPointAttributes.py", "boxplot.py"), "%s/data_%s_region_*.txt" % (statDir, groupList[0]), "%s/data_%s_region_*.txt" % (statDir, groupList[1]), statDir, groupList[0], groupList[1], groupList[0], groupList[1])
+      print runCmd
+      system.run_process(runCmd,verbose=True)
 
 
 
@@ -314,7 +317,7 @@ def computeThickness(config, data, outputdir, ids, idl, idh):
     if (not os.path.isfile(measurementoutput)):
       cmd = "%s --mr --sbt --workdir %s --ids %s --idl %s --idh %s --ttrns 500 %s %s" % (pathTool, workdir, ids, idl, idh, labelmap, measurementoutput)
       print cmd
-      os.system(cmd)
+      system.run_process(cmd,verbose=True)
     else:
       print "Skipping", measurementoutput
 
@@ -344,9 +347,9 @@ def precorrespondence(config, data, outputDir, ids):
     surfaceMeshPara = "%s/%s.subj.Param.vtk" % (workdir, id)
 
     if (not os.path.isfile(parafile)):
-      cmd = "%s --EulerFile --outEulerName %s --logFile --outLogName %s %s --label %s %s %s" % (pathGenParaMesh, eulerName, logFileName, labelmap, ids, parafile, surffile)
+      cmd = "%s --EulerFile --outEulerName %s %s --label %s %s %s" % (pathGenParaMesh, eulerName, labelmap, ids, parafile, surffile)
       print cmd
-      os.system(cmd)
+      system.run_process(cmd,verbose=True)
 
     if (not os.path.isfile(initialMesh) or os.stat(initialMesh).st_size == 0):
       if (prevId == ""):
@@ -354,7 +357,7 @@ def precorrespondence(config, data, outputDir, ids):
       else:
         cmd = "%s %s %s --subdivLevel 10 --spharmDegree 20  %s/%s.ip. --flipTemplateOn --flipTemplate %s/%s.ip.SPHARM.coef --paraOut" % (pathParaToSPHARM, parafile, surffile, workdir, id, workdir, prevId)
       print cmd
-      os.system(cmd)
+      system.run_process(cmd,verbose=True)
 
     if (not os.path.isfile(surfaceMesh) or os.stat(surfaceMesh).st_size == 0):
       if (prevId == ""):
@@ -362,7 +365,7 @@ def precorrespondence(config, data, outputDir, ids):
       else:
         cmd = "%s %s %s --subdivLevel 50 --spharmDegree 20  %s/%s.subj. --flipTemplateOn --flipTemplate %s/%s.subj.SPHARM.coef --paraOut" % (pathParaToSPHARM, parafile, surffile, workdir, id, workdir, prevId)
       print cmd
-      os.system(cmd)
+      system.run_process(cmd,verbose=True)
       
 
     labelMapNC = "%s/%s.labelMapNCsegmentationOriginal.nrrd" % (workdir, id)
@@ -373,12 +376,12 @@ def precorrespondence(config, data, outputDir, ids):
       if (prevId == ""):
         # for the first subject, do not create resampled version of NCsegmentation
         cmd = "%s %s -extractLabel %s -outfile %s" % (pathImageMath, labelmap, ids, labelMapNCResampled)
-        os.system(cmd)
+        system.run_process(cmd,verbose=True)
       else:
         cmd = "%s %s -extractLabel %s -outfile %s" % (pathImageMath, labelmap, ids, labelMapNC)
-        os.system(cmd)
+        system.run_process(cmd,verbose=True)
         cmd = "%s %s %s -R %s -i nn" % (pathResampleVolume, labelMapNC, labelMapNCResampled, "%s/%s.labelMapNCsegmentation.nrrd" % (workdir, prevId))
-        os.system(cmd)
+        system.run_process(cmd,verbose=True)
       
     prevId = id
     inputSurfaceFiles.write("%s/%s.ip.SPHARM.vtk\n" % (workdir, id))
@@ -411,18 +414,18 @@ def correctBoundaryConditions(data, config, outputdir):
 
     cmd = "%s -e 'A==3?0:A' -o %s %s" % (pathKcalc, labelOutput, labelMap)
     print cmd
-    os.system(cmd)
+    system.run_process(cmd,verbose=True)
 
 
     cmd = "%s -sampleImage -zrotate %s %s %s -outputScalarName labels" % (pathKmesh, labelOutput, surfaceInput, surfaceLabels)
     print cmd
-    os.system(cmd)
+    system.run_process(cmd,verbose=True)
 
   cmd = "%s -averageScalars -threshold 1.8 -scalarName labels -outputScalarName meanLabels" % (pathKmesh)
   for (tag, labelmap, group) in data:
     cmd += " " + workdir + "/" + tag + ".labels.vtp"
   print cmd
-  os.system(cmd)
+  system.run_process(cmd,verbose=True)
 
   for (idx, item) in enumerate(data):
     tag = item[0]
@@ -438,15 +441,15 @@ def correctBoundaryConditions(data, config, outputdir):
 
     cmd = "%s -voronoiImage -zrotate %s %s %s -scalarName meanLabels" % (pathKmesh, labelOutput, surfaceLabels, voronoiImage)
     print cmd
-    os.system(cmd)
+    system.run_process(cmd,verbose=True)
 
     cmd = "%s -scanConversion -zrotate %s %s %s" % (pathKmesh, surfaceLabels, labelOutput, surfaceImage)
     print cmd
-    os.system(cmd)
+    system.run_process(cmd,verbose=True)
 
     cmd = "%s -e 'B>0?3:A' -o %s %s %s" % (pathKcalc, boundaryMap, voronoiImage, surfaceImage)
     print cmd
-    os.system(cmd)
+    system.run_process(cmd,verbose=True)
 
 def runcorrespondence(bmsfile, config, data, outputdir, ids):
   pathPython = config["PythonPath"]
@@ -461,8 +464,7 @@ def runcorrespondence(bmsfile, config, data, outputdir, ids):
   # generate binary distance map for each label map
   # cmd = "%s %s %s/inputimage.txt %s/inputsurfacemodels.txt -c %s/outputCorrespondence.txt -w %s/outputWarped.txt --workingDir %s --pathShapeWorksRun %s --pathShapeWorksGroom %s --pathImageMath %s --pathBinaryToDistanceMap %s" % (pathPython, pathShapeWorksScript, workdir, workdir, workdir, workdir, workdir, pathShapeWorksRun, pathShapeWorksGroom, pathImageMath, pathBinaryToDistanceMap)
   cmd = "%s %s %s/inputimage.txt %s/inputsurfacemodels.txt -c %s/outputCorrespondence.txt -w %s/outputWarped.txt --workingDir %s --configbms %s" % (pathPython, pathShapeWorksScript, workdir, workdir, workdir, workdir, workdir, bmsfile)
-  print cmd
-  os.system(cmd)
+  system.run_process(cmd,verbose=True)
 
 
 
@@ -513,6 +515,7 @@ if (__name__ == "__main__"):
 
   parser.add_option("--regionSplit", help="split the data file with its region (1st column)", dest="regionSplit", action="store_true")
   parser.add_option("--outputPattern", help="Specify the output pattern ex) --outputPattern region_control_%02d.txt", dest="outputPattern")
+  parser.add_option("--logFile", help="Specify the filename for logging stdout and stderr outputs", dest="logfileName", default=None)
 
   (opts, args) = parser.parse_args()
 
@@ -521,6 +524,13 @@ if (__name__ == "__main__"):
     performSplit(args, opts.outputPattern)
     # just finish the script
     sys.exit(0)
+
+
+  if opts.logfileName is not None:
+    system.rename_logfile(opts.logfileName)
+    system.setup_logger(logfilename=opts.logfileName)
+  else:
+    system.setup_logger()
 
   if (len(args) < 3):
     parser.print_help()
