@@ -10,6 +10,14 @@ import logging
 import fcntl
 
 
+log_commands = False
+
+# setup the global variable log_commands
+# if log_commands is True, it will not execute the command but only logs it
+def set_log_commands(setting):
+  global log_commands
+  log_commands = setting
+
 def setup_logger(logfilename=None, logformat=None, loglevel=logging.INFO):
   if logformat is None:
     logformat="%(levelname)s %(asctime)s %(message)s"
@@ -33,18 +41,16 @@ def safe_readline(instream):
 def find_program(program):
     def is_exe(fpath):
         return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
-
     fpath, fname = os.path.split(program)
     if fpath:
         if is_exe(program):
             return program
     else:
-        for path in os.environ["PATH"].split(os.sep):
-            path = path.strip('"')
+        for path in os.environ["PATH"].split(os.pathsep):
+            path = path.strip('"').strip("'")
             exe_file = os.path.join(path, program)
             if is_exe(exe_file):
                 return exe_file
-
     return None
 
 
@@ -64,6 +70,13 @@ def run_process(cmdline, loggerName="", verbose=False):
       cmd[0] = exename
       cmdline = " ".join(cmd)
 
+    # if log_commands is True
+    # just log the command line and return
+    global log_commands
+    if log_commands:
+      logger.log(loggingCMDS, cmdline)
+      return 0
+
     p = Popen(cmd, stdout=PIPE, stderr=PIPE, shell=False)
 
     # log the command line executing
@@ -78,10 +91,9 @@ def run_process(cmdline, loggerName="", verbose=False):
         # non-blocking stdout readline()
         stdline = safe_readline(p.stdout)
         while stdline:
-          if stdline:
-            logger.info(stdline)
-            if verbose:
-              print stdline
+          logger.info(stdline)
+          if verbose:
+            print stdline
           stdline = safe_readline(p.stdout)
 
         # non-blocking stderr readline()
@@ -109,8 +121,9 @@ def run_process(cmdline, loggerName="", verbose=False):
           if verbose:
             print errline
 
-    except KeyboardInterrupt:
-      pass
+    except KeyboardInterrupt as ke:
+      logger.info("Keyboard Interrupt!")
+      raise ke
 
     logger.info("returncode[%s] = %d" % (cmd[0], 0 if p.returncode is None else p.returncode))
     return p.returncode

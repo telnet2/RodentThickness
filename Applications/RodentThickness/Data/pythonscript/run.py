@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/tools/Python/Current/bin/python
 
 
 from optparse import OptionParser
@@ -35,7 +35,13 @@ def file2string(f):
   lines = fin.readlines()
   lines = map(lambda x: x.strip(), lines)
   return lines
-   
+
+
+def find_executables(exes):
+  for exe in exes:
+    if system.find_program(exe) is None:
+      raise RuntimeError("can't find %s in PATH variable" % exe)
+
 
 def concatColumnsToFile(input, output, inputIsList=False):
   if (inputIsList):
@@ -321,6 +327,77 @@ def computeThickness(config, data, outputdir, ids, idl, idh):
     else:
       print "Skipping", measurementoutput
 
+
+
+
+def genparamesh(opts, config, data, outputDir):
+  pathGenParaMesh = config["GenParaMeshCLPPath"]
+  pathImageMath = config["ImageMathPath"]
+  pathSegPostProcess = "SegPostProcess" #config["SegPostProcess"]
+  workdir = "%s/Processing/1.MeasurementandSPHARM" % (outputDir)
+
+  # check if executables exist
+  find_executables([pathGenParaMesh, pathImageMath, pathSegPostProcess])
+
+  def file_exists(f):
+    return not opts.overwrite and os.path.isfile(f) and os.stat(f).st_size > 0
+
+  for (id, labelmap, group) in data:
+    eulerName = "%s/%s.euler.txt" % (workdir, id)
+    paraFile = "%s/%s.para.vtk" % (workdir, id)
+    surfFile = "%s/%s.surf.vtk" % (workdir, id)
+    surfaceLabel = "%s/%s.seg.nii.gz" % (workdir, id)
+    segpostLabel = "%s/%s.segpost.nii.gz" % (workdir, id)
+
+    if (not file_exists(surfaceLabel)):
+      cmd = "%s %s -extractLabel %s -outfile %s" \
+        % (pathImageMath, labelmap, opts.ids, surfaceLabel)
+      system.run_process(cmd)
+
+    if (not file_exists(segpostLabel)):
+      cmd = "%s %s -o %s" \
+        % (pathSegPostProcess, surfaceLabel, segpostLabel)
+      system.run_process(cmd)
+
+    if (not file_exists(paraFile)):
+      num_iters = opts.genparamesh_iter
+      cmd = "%s --EulerFile --outEulerName %s %s --iter %d --label %s %s %s" \
+          % (pathGenParaMesh, eulerName, segpostLabel, num_iters, 1, paraFile, surfFile)
+      system.run_process(cmd,verbose=True)
+
+
+def paratospharm(opts, config, data, outputDir):
+  workdir = "%s/Processing/1.MeasurementandSPHARM" % (outputDir)
+  pathParaToSPHARM = config["ParaToSPHARMMeshCLPPath"]
+
+  idlist = [id for id,l,g in data]
+  parafiles = ["%s/%s.para.vtk"%(workdir,id) for id,l,g in data]
+  surffiles = ["%s/%s.surf.vtk"%(workdir,id) for id,l,g in data]
+  lowresfiles = ["%s/%s.ip.SPHARM.vtk"%(workdir,id) for id,l,g in data]
+  lowresparams = ["%s/%s.ip.Param.vtk"%(workdir,id) for id,l,g in data]
+  highresfiles = ["%s/%s.subj.SPHARM.vtk"%(workdir,id) for id,l,g in data]
+  highresparams = ["%s/%s.subj.Param.vtk"%(workdir,id) for id,l,g in data]
+  dataset = zip(parafiles, surffiles, lowresfiles, lowresparams, highresfiles, highresparams)
+
+  def file_exists(f):
+    return not opts.overwrite and os.path.isfile(f) and os.stat(f).st_size > 0
+
+  for idx,(pf,sf,lm,lp,hm,hp) in enumerate(dataset):
+    if not file_exists(lm):
+      if idx == 0:
+        cmd = "%s %s %s --subdivLevel 10 --spharmDegree 20  %s/%s.ip. --paraOut" % (pathParaToSPHARM, pf, sf, workdir, idlist[idx])
+      else:
+        cmd = "%s %s %s --subdivLevel 10 --spharmDegree 20  %s/%s.ip. --flipTemplateOn --flipTemplate %s/%s.ip.SPHARM.coef --paraOut" % (pathParaToSPHARM, pf, sf, workdir, idlist[idx], workdir, idlist[idx-1])
+      system.run_process(cmd,verbose=True)
+
+    if not file_exists(hm):
+      if idx == 0:
+        cmd = "%s %s %s --subdivLevel 50 --spharmDegree 20  %s/%s.subj. --paraOut" % (pathParaToSPHARM, pf, sf, workdir, idlist[idx])
+      else:
+        cmd = "%s %s %s --subdivLevel 50 --spharmDegree 20  %s/%s.subj. --flipTemplateOn --flipTemplate %s/%s.subj.SPHARM.coef --paraOut" % (pathParaToSPHARM, pf, sf, workdir, idlist[idx], workdir, idlist[idx-1])
+      system.run_process(cmd,verbose=True)
+      
+
 def precorrespondence(config, data, outputDir, ids):
   pathGenParaMesh = config["GenParaMeshCLPPath"]
   pathParaToSPHARM = config["ParaToSPHARMMeshCLPPath"]
@@ -338,9 +415,9 @@ def precorrespondence(config, data, outputDir, ids):
 
     workdir = "%s/Processing/1.MeasurementandSPHARM" % (outputDir)
     eulerName = "%s/EulerFile/Euler_%s.txt" % (workdir, id)
-    logFileName = "%s/%s_log.txt" % (workdir, id)
-    parafile = "%s/%s_para.vtk" % (workdir, id)
-    surffile = "%s/%s_surf.vtk" % (workdir, id)
+    logFileName = "%s/%s.log.txt" % (workdir, id)
+    parafile = "%s/%s.para.vtk" % (workdir, id)
+    surffile = "%s/%s.surf.vtk" % (workdir, id)
     initialMesh = "%s/%s.ip.SPHARM.vtk" % (workdir, id)
     initialMeshPara = "%s/%s.ip.Param.vtk" % (workdir, id)
     surfaceMesh = "%s/%s.subj.SPHARM.vtk" % (workdir, id)
@@ -348,7 +425,6 @@ def precorrespondence(config, data, outputDir, ids):
 
     if (not os.path.isfile(parafile)):
       cmd = "%s --EulerFile --outEulerName %s %s --label %s %s %s" % (pathGenParaMesh, eulerName, labelmap, ids, parafile, surffile)
-      print cmd
       system.run_process(cmd,verbose=True)
 
     if (not os.path.isfile(initialMesh) or os.stat(initialMesh).st_size == 0):
@@ -356,7 +432,6 @@ def precorrespondence(config, data, outputDir, ids):
         cmd = "%s %s %s --subdivLevel 10 --spharmDegree 20  %s/%s.ip. --paraOut" % (pathParaToSPHARM, parafile, surffile, workdir, id)
       else:
         cmd = "%s %s %s --subdivLevel 10 --spharmDegree 20  %s/%s.ip. --flipTemplateOn --flipTemplate %s/%s.ip.SPHARM.coef --paraOut" % (pathParaToSPHARM, parafile, surffile, workdir, id, workdir, prevId)
-      print cmd
       system.run_process(cmd,verbose=True)
 
     if (not os.path.isfile(surfaceMesh) or os.stat(surfaceMesh).st_size == 0):
@@ -364,7 +439,6 @@ def precorrespondence(config, data, outputDir, ids):
         cmd = "%s %s %s --subdivLevel 50 --spharmDegree 20  %s/%s.subj. --paraOut" % (pathParaToSPHARM, parafile, surffile, workdir, id)
       else:
         cmd = "%s %s %s --subdivLevel 50 --spharmDegree 20  %s/%s.subj. --flipTemplateOn --flipTemplate %s/%s.subj.SPHARM.coef --paraOut" % (pathParaToSPHARM, parafile, surffile, workdir, id, workdir, prevId)
-      print cmd
       system.run_process(cmd,verbose=True)
       
 
@@ -400,6 +474,19 @@ def correctBoundaryConditions(data, config, outputdir):
   pathKcalc = config["kcalcPath"]
   workdir = "%s/Processing/1.MeasurementandSPHARM" % (outputdir)
 
+
+  # before executing the boundary correction
+  # check if none of input is not generated.
+  labelMapList = [labelMap for (tag, labelMap, group) in data]
+  testLabelMapsFail = False in [os.path.exists(x) for x in labelMapList]
+  if testLabelMapsFail:
+    raise RuntimeError("There are missing label maps")
+
+  surfaceInputList = ["%s/%s.subj.SPHARM.vtk" % (workdir, tag) for (tag,labelMap,group) in data]
+  testSurfaceInputsFail = False in [os.path.exists(x) for x in surfaceInputList]
+  if testSurfaceInputsFail:
+    raise RuntimeError("There are missing surface inputs. Check SPHARM results!")
+
   for (idx, item) in enumerate(data):
     tag = item[0]
     labelMap = item[1]
@@ -413,12 +500,10 @@ def correctBoundaryConditions(data, config, outputdir):
     boundaryMap = workdir + "/" + tag + ".boundaryMap.mha"
 
     cmd = "%s -e 'A==3?0:A' -o %s %s" % (pathKcalc, labelOutput, labelMap)
-    print cmd
     system.run_process(cmd,verbose=True)
 
 
     cmd = "%s -sampleImage -zrotate %s %s %s -outputScalarName labels" % (pathKmesh, labelOutput, surfaceInput, surfaceLabels)
-    print cmd
     system.run_process(cmd,verbose=True)
 
   cmd = "%s -averageScalars -threshold 1.8 -scalarName labels -outputScalarName meanLabels" % (pathKmesh)
@@ -500,6 +585,9 @@ def performSplit(args, outputPattern):
 if (__name__ == "__main__"):
   parser = OptionParser(usage="usage: %prog dataset.csv config.bms output-directory")
 #  parser.add_option("--labelprocessing", help="preprocessing for label map generation", action="store_true", dest="labelprocessing")
+  parser.add_option("--genparamesh", help="generate SPHARM parameter and surface mesh", action="store_true", dest="genparamesh")
+  parser.add_option("--genparamesh-iter", help="set the number of iteration for GenParaMesh", type="int", dest="genparamesh_iter", default=100)
+  parser.add_option("--paratospharm", help="reconstruct surface mesh from PSHARM parameters", action="store_true", dest="paratospharm")
   parser.add_option("--precorrespondence", help="preprocessing for particle correspondence", action="store_true", dest="precorrespondence")
   parser.add_option("--runcorrespondence", help="run particle correspondence", action="store_true", dest="runcorrespondence")
   parser.add_option("--computeThickness", help="compute thickness for a given label", action="store_true", dest="computeThickness")
@@ -515,7 +603,9 @@ if (__name__ == "__main__"):
 
   parser.add_option("--regionSplit", help="split the data file with its region (1st column)", dest="regionSplit", action="store_true")
   parser.add_option("--outputPattern", help="Specify the output pattern ex) --outputPattern region_control_%02d.txt", dest="outputPattern")
+  parser.add_option("--overwrite", help="specify if the script overwrites previous results", action="store_true", dest="overwrite")
   parser.add_option("--logFile", help="Specify the filename for logging stdout and stderr outputs", dest="logfileName", default=None)
+  parser.add_option("--log-commands", help="Specify if the script logs only command lines not executing those", action="store_true", dest="log_commands")
 
   (opts, args) = parser.parse_args()
 
@@ -526,19 +616,26 @@ if (__name__ == "__main__"):
     sys.exit(0)
 
 
+  # set up the logger for external programs
+  if opts.log_commands:
+    logformat = "%(message)s"
+  else:
+    logformat = "%(levelname)s %(asctime)s %(message)s"
+
   if opts.logfileName is not None:
     system.rename_logfile(opts.logfileName)
-    system.setup_logger(logfilename=opts.logfileName)
+    system.setup_logger(logfilename=opts.logfileName, logformat=logformat)
   else:
-    system.setup_logger()
+    system.setup_logger(logformat=logformat)
 
+
+  # argument processing
   if (len(args) < 3):
     parser.print_help()
   else:
     csvfile = args[0]
     bmsfile = args[1]
     outputdir = args[2]
-
 
     if (not os.path.isdir("%s/Processing/1.MeasurementandSPHARM" % (outputdir))):
       os.makedirs("%s/Processing/1.MeasurementandSPHARM" % (outputdir))
@@ -566,14 +663,27 @@ if (__name__ == "__main__"):
       dataGroups.append(csvline[2])
       csvdata.append(csvline) 
 
+    if (opts.log_commands):
+      system.set_log_commands(True)
+
+    if (opts.genparamesh):
+      genparamesh(opts, config, csvdata, outputdir)
+
+    if (opts.paratospharm):
+      paratospharm(opts, config, csvdata, outputdir)
+
     if (opts.precorrespondence):
       precorrespondence(config, csvdata, outputdir, opts.ids)
+
     if (opts.boundaryCorrection):
       correctBoundaryConditions(csvdata, config, outputdir)
+
     if (opts.computeThickness):
       computeThickness(config, csvdata, outputdir, opts.ids, opts.idl, opts.idh)
+
     if (opts.runcorrespondence):
       runcorrespondence(bmsfile, config, csvdata, outputdir, opts.ids)
+
     if (opts.runstats):
 #      performAnalysis(csvdata, config, outputdir, "spharm_sampling")
       performAnalysis(csvdata, config, outputdir, "initial_dense")
