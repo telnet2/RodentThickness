@@ -307,7 +307,7 @@ def labelprocessing(config, csvdata, outputdir, labelNCleft, labelNCright, label
 
 # run thickness measurement
 # if the measurement file exists, skip it
-def computeThickness(config, data, outputdir, ids, idl, idh):
+def compute_thickness(config, data, outputdir, ids, idl, idh):
   pathTool = config["measureThicknessFilterPath"]
   for (id, labelmap, group) in data:
     workdir = "%s/Processing/1.MeasurementandSPHARM/%s" % (outputdir, id)
@@ -374,8 +374,8 @@ def paratospharm(opts, config, data, outputDir):
   parafiles = ["%s/%s.para.vtk"%(workdir,id) for id,l,g in data]
   surffiles = ["%s/%s.surf.vtk"%(workdir,id) for id,l,g in data]
   lowresfiles = ["%s/%s.ip.SPHARM.vtk"%(workdir,id) for id,l,g in data]
-  lowresparams = ["%s/%s.ip.Param.vtk"%(workdir,id) for id,l,g in data]
   highresfiles = ["%s/%s.subj.SPHARM.vtk"%(workdir,id) for id,l,g in data]
+  lowresparams = ["%s/%s.ip.Param.vtk"%(workdir,id) for id,l,g in data]
   highresparams = ["%s/%s.subj.Param.vtk"%(workdir,id) for id,l,g in data]
   dataset = zip(parafiles, surffiles, lowresfiles, lowresparams, highresfiles, highresparams)
 
@@ -398,78 +398,47 @@ def paratospharm(opts, config, data, outputDir):
       system.run_process(cmd,verbose=opts.verbose)
       
 
-def precorrespondence(config, data, outputDir, ids):
-  pathGenParaMesh = config["GenParaMeshCLPPath"]
-  pathParaToSPHARM = config["ParaToSPHARMMeshCLPPath"]
-  pathImageMath = config["ImageMathPath"]
-  pathResampleVolume = config["ResampleVolume2Path"]
+def resample_segmentations(config,data,outputdir):
+  workdir = "%s/Processing/1.MeasurementandSPHARM" % (outputDir)
+  reference_image = "%s/%s.segpost.nii.gz" % (workdir,data[0][0])
 
+  pathResampleVolume = config["ResampleVolume2Path"]
+  for id,l,g in data:
+    segpost_image = "%s/%s.segpost.nii.gz" % (workdir,id)
+    labelMapNCResampled = "%s/%s.labelMapNCsegmentation.nrrd" % (workdir,id)
+    cmd = "%s %s %s -R %s -i nn" % (pathResampleVolume, \
+        segpost_image, labelMapNCResampled, reference_image)
+    system.run_process(cmd,verbose=True)
+ 
+
+def setup_particle_tools(config, data, outputDir, ids):
   inputSurfaceFiles = open("%s/Processing/2.shapeworks/inputsurfacemodels.txt" % (outputDir), 'w')
   inputImageFiles = open("%s/Processing/2.shapeworks/inputimage.txt" % (outputDir), 'w')
   outputCorrespondenceFiles = open("%s/Processing/2.shapeworks/outputCorrespondence.txt" % (outputDir), 'w')
   outputWarpedFiles = open("%s/Processing/2.shapeworks/outputWarped.txt" % (outputDir), 'w')
 
-  prevId = ""
-  for (idx, item) in enumerate(data):
-    (id, labelmap, group) = item
+  workdir = "%s/Processing/1.MeasurementandSPHARM" % (outputDir)
+  lowresfiles = ["%s/%s.ip.SPHARM.vtk"%(workdir,id) for id,l,g in data]
+  highresfiles = ["%s/%s.subj.SPHARM.vtk"%(workdir,id) for id,l,g in data]
+  shapedir = "%s/Processing/2.shapeworks" % (outputDir)
+  correspondencefiles = ["%s/%s.correspondence.vtk"%(shapedir,id) for id,l,g in data]
+  warpedfiles = ["%s/%s.warped.vtk"%(shapedir,id) for id,l,g in data]
 
-    workdir = "%s/Processing/1.MeasurementandSPHARM" % (outputDir)
-    eulerName = "%s/EulerFile/Euler_%s.txt" % (workdir, id)
-    logFileName = "%s/%s.log.txt" % (workdir, id)
-    parafile = "%s/%s.para.vtk" % (workdir, id)
-    surffile = "%s/%s.surf.vtk" % (workdir, id)
-    initialMesh = "%s/%s.ip.SPHARM.vtk" % (workdir, id)
-    initialMeshPara = "%s/%s.ip.Param.vtk" % (workdir, id)
-    surfaceMesh = "%s/%s.subj.SPHARM.vtk" % (workdir, id)
-    surfaceMeshPara = "%s/%s.subj.Param.vtk" % (workdir, id)
-
-    if (not os.path.isfile(parafile)):
-      cmd = "%s --EulerFile --outEulerName %s %s --label %s %s %s" % (pathGenParaMesh, eulerName, labelmap, ids, parafile, surffile)
-      system.run_process(cmd,verbose=True)
-
-    if (not os.path.isfile(initialMesh) or os.stat(initialMesh).st_size == 0):
-      if (prevId == ""):
-        cmd = "%s %s %s --subdivLevel 10 --spharmDegree 20  %s/%s.ip. --paraOut" % (pathParaToSPHARM, parafile, surffile, workdir, id)
-      else:
-        cmd = "%s %s %s --subdivLevel 10 --spharmDegree 20  %s/%s.ip. --flipTemplateOn --flipTemplate %s/%s.ip.SPHARM.coef --paraOut" % (pathParaToSPHARM, parafile, surffile, workdir, id, workdir, prevId)
-      system.run_process(cmd,verbose=True)
-
-    if (not os.path.isfile(surfaceMesh) or os.stat(surfaceMesh).st_size == 0):
-      if (prevId == ""):
-        cmd = "%s %s %s --subdivLevel 50 --spharmDegree 20  %s/%s.subj. --paraOut" % (pathParaToSPHARM, parafile, surffile, workdir, id)
-      else:
-        cmd = "%s %s %s --subdivLevel 50 --spharmDegree 20  %s/%s.subj. --flipTemplateOn --flipTemplate %s/%s.subj.SPHARM.coef --paraOut" % (pathParaToSPHARM, parafile, surffile, workdir, id, workdir, prevId)
-      system.run_process(cmd,verbose=True)
-      
-
-    labelMapNC = "%s/%s.labelMapNCsegmentationOriginal.nrrd" % (workdir, id)
-    labelMapNCResampled = "%s/%s.labelMapNCsegmentation.nrrd" % (workdir, id)
-    if (not os.path.isfile(labelMapNC)):
-
-      # create binary level set with same dimension
-      if (prevId == ""):
-        # for the first subject, do not create resampled version of NCsegmentation
-        cmd = "%s %s -extractLabel %s -outfile %s" % (pathImageMath, labelmap, ids, labelMapNCResampled)
-        system.run_process(cmd,verbose=True)
-      else:
-        cmd = "%s %s -extractLabel %s -outfile %s" % (pathImageMath, labelmap, ids, labelMapNC)
-        system.run_process(cmd,verbose=True)
-        cmd = "%s %s %s -R %s -i nn" % (pathResampleVolume, labelMapNC, labelMapNCResampled, "%s/%s.labelMapNCsegmentation.nrrd" % (workdir, prevId))
-        system.run_process(cmd,verbose=True)
-      
-    prevId = id
-    inputSurfaceFiles.write("%s/%s.ip.SPHARM.vtk\n" % (workdir, id))
-    inputImageFiles.write(labelMapNCResampled + "\n")
-    outputCorrespondenceFiles.write("%s/Processing/2.shapeworks/%s.correspondence.vtk\n" % (outputdir, id))
-    outputWarpedFiles.write("%s/Processing/2.shapeworks/%s.warped.vtk\n" % (outputdir, id))
+  # file generation
+  inputSurfaceFiles.write("\n".join(lowresfiles))
+  inputImageFiles.write("\n".join(segmentationfiles))
+  outputCorrespondenceFiles.write("\n".join(correspondencefiles))
+  outputWarpedFiles.write("\n".join(warpedfiles))
 
   inputSurfaceFiles.close()
   inputImageFiles.close()
   outputCorrespondenceFiles.close()
   outputWarpedFiles.close()
 
+
+
 # @brief compute consistent boundary conditions from surface maps
-def correctBoundaryConditions(data, config, outputdir):
+def regenerate_segmentations(data, config, outputdir):
   pathKmesh = config["kmeshPath"]
   pathKcalc = config["kcalcPath"]
   workdir = "%s/Processing/1.MeasurementandSPHARM" % (outputdir)
@@ -501,7 +470,6 @@ def correctBoundaryConditions(data, config, outputdir):
 
     cmd = "%s -e 'A==3?0:A' -o %s %s" % (pathKcalc, labelOutput, labelMap)
     system.run_process(cmd,verbose=True)
-
 
     cmd = "%s -sampleImage -zrotate %s %s %s -outputScalarName labels" % (pathKmesh, labelOutput, surfaceInput, surfaceLabels)
     system.run_process(cmd,verbose=True)
@@ -536,7 +504,7 @@ def correctBoundaryConditions(data, config, outputdir):
     print cmd
     system.run_process(cmd,verbose=True)
 
-def runcorrespondence(bmsfile, config, data, outputdir, ids):
+def run_particle_tools(bmsfile, config, data, outputdir, ids):
   pathPython = config["PythonPath"]
   pathShapeWorksScript = config["ShapeWorksPythonScriptPath"]
   pathShapeWorksRun = config["ShapeWorksRunPath"]
@@ -588,11 +556,11 @@ if (__name__ == "__main__"):
   parser.add_option("--genparamesh", help="generate SPHARM parameter and surface mesh", action="store_true", dest="genparamesh")
   parser.add_option("--genparamesh-iter", metavar="NUM", help="set the number of iteration for GenParaMesh (default: 100)", type="int", dest="genparamesh_iter", default=100)
   parser.add_option("--paratospharm", help="reconstruct surface mesh from SPHARM parameters", action="store_true", dest="paratospharm")
-  parser.add_option("--precorrespondence", help="preprocessing for particle correspondence", action="store_true", dest="precorrespondence")
-  parser.add_option("--runcorrespondence", help="run particle correspondence", action="store_true", dest="runcorrespondence")
-  parser.add_option("--computeThickness", help="compute thickness for a given label", action="store_true", dest="computeThickness")
-  parser.add_option("--runstats", help="run statistical analysis", action="store_true", dest="runstats")
-  parser.add_option("--boundary-correction", dest="boundary_correction", help="Correct boundary conditions more consistent", action="store_true")
+  parser.add_option("--resample-segmenations", help="resample segmentation images to have consistent dimensions", action="store_true", dest="resample_segmentations")
+  parser.add_option("--setup-particle-tools", help="generate input files for correspondence", action="store_true", dest="setup_particle_tools")
+  parser.add_option("--run-particle-tools", help="run particle correspondence", action="store_true", dest="run_particle_tools")
+  parser.add_option("--regenerate-segmentation", dest="regenerate_segmentation", help="Regenerate segmentation images based on reconstructed mesh", action="store_true")
+  parser.add_option("--compute-thickness", help="compute thickness for a given label", action="store_true", dest="compute_thickness")
   parser.add_option("--ids", help="solution label", dest="ids", default="3")
   parser.add_option("--idl", help="low boundary label", dest="idl", default="2")
   parser.add_option("--idh", help="high boundary label", dest="idh", default="1")
@@ -676,17 +644,20 @@ if (__name__ == "__main__"):
     if (opts.paratospharm):
       paratospharm(opts, config, csvdata, outputdir)
 
-    if (opts.precorrespondence):
-      precorrespondence(config, csvdata, outputdir, opts.ids)
+    if (opts.resample_segmentations):
+      resample_segmentations(opts,config,csvdata,outputdir)
 
-    if (opts.boundary_correction):
-      correctBoundaryConditions(csvdata, config, outputdir)
+    if (opts.setup_particle_tools):
+      setup_particle_tools(config, csvdata, outputdir, opts.ids)
 
-    if (opts.computeThickness):
-      computeThickness(config, csvdata, outputdir, opts.ids, opts.idl, opts.idh)
+    if (opts.regenerate_segmentations):
+      regenerate_segmentations(csvdata, config, outputdir)
 
-    if (opts.runcorrespondence):
-      runcorrespondence(bmsfile, config, csvdata, outputdir, opts.ids)
+    if (opts.compute_thickness):
+      compute_thickness(config, csvdata, outputdir, opts.ids, opts.idl, opts.idh)
+
+    if (opts.run_particle_tools):
+      run_particle_tools(config, csvdata, outputdir, opts.ids)
 
     if (opts.runstats):
 #      performAnalysis(csvdata, config, outputdir, "spharm_sampling")
