@@ -14,8 +14,6 @@ ENDIF(SlicerExecutionModel_FOUND)
 FIND_PACKAGE(ITK REQUIRED)
 INCLUDE(${ITK_USE_FILE})
 
-
-
 GENERATECLP(MeshPointsIntensitySampling.cxx MeshPointsIntensitySampling.xml)
 ADD_EXECUTABLE(MeshPointsIntensitySampling MeshPointsIntensitySampling.cxx MeshPointsIntensitySamplingCLP.h vtkPolyDataToitkMesh.cxx vtkPolyDataToitkMesh.h vtkio.cpp vtkio.h)
 TARGET_LINK_LIBRARIES(MeshPointsIntensitySampling ${ITK_LIBRARIES} vtkFiltering vtkIO vtkGraphics)
