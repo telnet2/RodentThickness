@@ -6,7 +6,7 @@ from vtk import vtkPolyDataReader, vtkPolyDataWriter, vtkThinPlateSplineTransfor
 imageMathPath = " "
 shapeWorksRun = " "
 shapeWorksGroom = " "
-imageStatPath = " "
+kcalcPath = " "
 binary2distanceMap = " "
 
 def warp(srcLandmark,dstLandmark,subj):
@@ -120,7 +120,7 @@ def groom(imagesIn,imagesOut):
   execute("%s %s isolate hole_fill antialias fastmarching blur" % (shapeWorksGroom, "groom.xml"))
 
 def voxelSize(inputImage):
-  pstat = os.popen("%s %s -info" % ( imageStatPath, inputImage))
+  pstat = os.popen("%s %s -i" % ( kcalcPath, inputImage))
   lines = pstat.read()
   pstat.close()
   pixdims = [ i for i in lines.split("\n") if i.startswith("Pixdims") ]
@@ -231,7 +231,7 @@ if (__name__ =="__main__"):
   config = initializeConfig(opts.pathConfigBMS)
 
   imageMathPath = config["ImageMathPath"]
-  imageStatPath = config["ImageStatPath"]
+  kcalcPath = config["kcalcPath"]
   shapeWorksRun = config["ShapeWorksRunPath"]
   shapeWorksGroom = config["ShapeWorksGroomPath"]
   binary2distanceMap = config["BinaryToDistanceMapPath"]
