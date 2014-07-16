@@ -105,6 +105,7 @@ if(NOT ( DEFINED "${extProjName}_DIR" OR ( DEFINED "${USE_SYSTEM_${extProjName}}
       -DITK_USE_REVIEW:BOOL=ON
       #-DITK_INSTALL_NO_DEVELOPMENT:BOOL=ON
       -DITK_BUILD_ALL_MODULES:BOOL=ON
+      -DITKGroup_ThirdParty:BOOL=ON
       -DKWSYS_USE_MD5:BOOL=ON # Required by SlicerExecutionModel
       -DITK_WRAPPING:BOOL=OFF #${BUILD_SHARED_LIBS} ## HACK: QUICK CHANGE
       -DITK_USE_SYSTEM_DCMTK:BOOL=${${PROJECT_NAME}_BUILD_DICOM_SUPPORT}
@@ -115,7 +116,8 @@ if(NOT ( DEFINED "${extProjName}_DIR" OR ( DEFINED "${USE_SYSTEM_${extProjName}}
     )
   ### --- End Project specific additions
   set(${proj}_REPOSITORY ${git_protocol}://itk.org/ITK.git)
-  set(${proj}_GIT_TAG 3c03e162c7e287b81115e2175898482998b50a34) #2013-01-30 New FFTW DCMTK for DWIConvert with clang
+  #set(${proj}_GIT_TAG 3c03e162c7e287b81115e2175898482998b50a34) #2013-01-30 New FFTW DCMTK for DWIConvert with clang
+  set(${proj}_GIT_TAG 01661ccf9923b89873806a2de6a8571badaf6668) #2013-01-30 New FFTW DCMTK for DWIConvert with clang
   ExternalProject_Add(${proj}
     GIT_REPOSITORY ${${proj}_REPOSITORY}
     GIT_TAG ${${proj}_GIT_TAG}

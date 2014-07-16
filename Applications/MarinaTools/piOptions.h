@@ -124,7 +124,7 @@ namespace pi {
 
 
         /// main function for test
-        void main(Options& opts, StringVector& args);
+        /// void main(Options& opts, StringVector& args);
 
     private:
         StringVector _specNames;

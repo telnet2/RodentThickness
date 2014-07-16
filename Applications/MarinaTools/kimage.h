@@ -169,6 +169,8 @@ void ConvertImageT(std::string& imageFile, vtkUnstructuredGrid* imgData, typenam
     pi::ImageIO<X> itkIO;
     typename X::Pointer srcImg = itkIO.ReadImage(imageFile.c_str());
 
+    imgData = NULL;
+
 
     /// - Create an instance for the output grid
     vtkUnstructuredGrid* imageData = vtkUnstructuredGrid::New();

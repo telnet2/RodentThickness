@@ -159,7 +159,7 @@ static void spharm_basis(int degree, double *p, double *Y) {
     // square root of 2
     const float sqr2 = sqrt(2.0f);
 
-    const int yCount = (degree - 1) * (degree - 1);
+    // const int yCount = (degree - 1) * (degree - 1);
 
     for (int l = 0; l <= degree; l++)
     {
@@ -205,7 +205,7 @@ void runSPHARMCoeff(Options& opts, StringVector& args) {
     /// Prepare values
     vnl_vector<double> values;
     values.set_size(scalars->GetNumberOfTuples());
-    for (int i = 0; i < nPoints; i++) {
+    for (unsigned int i = 0; i < nPoints; i++) {
         values[i] = scalars->GetTuple1(i);
     }
 
@@ -228,7 +228,7 @@ void runSPHARMCoeff(Options& opts, StringVector& args) {
     newScalars->SetNumberOfComponents(1);
     newScalars->SetNumberOfTuples(nPoints);
 
-    for (int i = 0; i < nPoints; i++) {
+    for (unsigned int i = 0; i < nPoints; i++) {
         newScalars->SetValue(i, interpolated[i]);
     }
     input->GetPointData()->AddArray(newScalars);
@@ -244,7 +244,7 @@ void runAppendData(Options& opts, StringVector& args) {
     vtkIO io;
 
     // read all files
-    for (int i = 0; i < args.size(); i++) {
+    for (unsigned int i = 0; i < args.size(); i++) {
         vtkPolyData* data = io.readFile(args[i]);
         appender->AddInput(data);
     }
@@ -673,6 +673,10 @@ bool endswith(std::string str, std::string substr) {
 
 /// @brief perform a line clipping to fit within the object
 bool performLineClipping(vtkPolyData* streamLines, vtkModifiedBSPTree* tree, int lineId, vtkCell* lineToClip, vtkPolyData* object, vtkPoints* outputPoints, vtkCellArray* outputLines, double &length) {
+    // suppress unused warnings
+    object = NULL;
+    lineId = 0;
+
     /// - Iterate over all points in a line
     vtkIdList* ids = lineToClip->GetPointIds();
     /// - Identify a line segment included in the line
@@ -1029,9 +1033,11 @@ void runRescaleStream(Options& opts, StringVector& args) {
         vtkPolyLine* line = vtkPolyLine::SafeDownCast(inputStream->GetCell(i));
         if (line == NULL) {
             vtkLine* aline = vtkLine::SafeDownCast(inputStream->GetCell(i));
+            aline = NULL;
         } else {
             // reduce length
         }
+        length = 0;
     }
 }
 
@@ -1338,16 +1344,16 @@ void runAverageScalars(Options& opts, StringVector& args) {
     scalars->SetName(opts.GetString("-outputScalarName").c_str());
     scalars->SetNumberOfValues(inputs[0]->GetNumberOfPoints());
 
-    for (int i = 0; i < args.size(); i++) {
+    for (uint i = 0; i < args.size(); i++) {
         if (i == 0) {
             vtkDataArray* inputScalars = inputs[i]->GetPointData()->GetScalars(opts.GetString("-scalarName").c_str());
-            for (int j = 0; j < scalars->GetNumberOfTuples(); j++) {
+            for (uint j = 0; j < scalars->GetNumberOfTuples(); j++) {
                 scalars->SetValue(j, inputScalars->GetTuple1(j));
             }
         } else {
             inputs[i] = vio.readFile(args[i]);
             vtkDataArray* inputScalars = inputs[i]->GetPointData()->GetScalars(opts.GetString("-scalarName").c_str());
-            for (int j = 0; j < scalars->GetNumberOfTuples(); j++) {
+            for (uint j = 0; j < scalars->GetNumberOfTuples(); j++) {
                 scalars->SetValue(j, scalars->GetValue(j) + inputScalars->GetTuple1(j));
             }
         }
@@ -1366,7 +1372,7 @@ void runAverageScalars(Options& opts, StringVector& args) {
         }
     }
 
-    for (int i = 0; i < args.size(); i++) {
+    for (unsigned int i = 0; i < args.size(); i++) {
         inputs[i]->GetPointData()->AddArray(scalars);
         cout << "Writing " << args[i] << endl;
         vio.writeFile(args[i], inputs[i]);
@@ -1550,18 +1556,18 @@ void runPCA(Options& opts, StringVector& args) {
     std::vector<vtkPolyData*> inputs;
     inputs.resize(args.size());
     /// - Read a series of vtk files
-    for (int i = 0; i < args.size(); i++) {
+    for (uint i = 0; i < args.size(); i++) {
         inputs[i] = vio.readFile(args[i]);
     }
 
     vtkPCAAnalysisFilter* pcaFilter = vtkPCAAnalysisFilter::New();
     pcaFilter->SetNumberOfInputs(args.size());
-    for (int i = 0; i < args.size(); i++) {
+    for (uint i = 0; i < args.size(); i++) {
         pcaFilter->SetInput(i, inputs[i]);
     }
     pcaFilter->Update();
     vtkFloatArray* eigenValues = pcaFilter->GetEvals();
-    for (int i = 0; i < eigenValues->GetNumberOfTuples(); i++) {
+    for (uint i = 0; i < eigenValues->GetNumberOfTuples(); i++) {
         cout << eigenValues->GetValue(i) << endl;
     }
 
@@ -1574,6 +1580,9 @@ void runPCA(Options& opts, StringVector& args) {
 
 /// @brief Perform Procrustes alignment
 void runProcrustes(Options& opts, StringVector& args) {
+    opts = opts;
+    args = args;
+
     int nInputs = args.size() / 2;
 
     vtkIO vio;
@@ -1585,7 +1594,7 @@ void runProcrustes(Options& opts, StringVector& args) {
     pros->GetLandmarkTransform()->SetModeToSimilarity();
     pros->Update();
 
-    for (int i = nInputs; i < args.size(); i++) {
+    for (unsigned int i = nInputs; i < args.size(); i++) {
         vio.writeFile(args[i], pros->GetOutput(i-nInputs));
     }
 
@@ -1682,7 +1691,7 @@ void runConnectScalars(Options& opts, StringVector& args) {
     std::vector<int> regionRanking;
     regionRanking.resize(regionAreas.size());
 
-    for (int i = 0; i < regionRanking.size(); i++) {
+    for (unsigned int i = 0; i < regionRanking.size(); i++) {
         regionRanking[regionAreas[i].first] = (i+1);
     }
 
@@ -1770,7 +1779,7 @@ void runConnectScalars(Options& opts, StringVector& args) {
 /// @brief Find neighbors of a point
 void extractNeighbors(std::vector<int>& ids, vtkPolyData* data, std::set<int>& neighbors, int nRing) {
     /// for every id in ids
-    for (int i = 0; i < ids.size(); i++) {
+    for (unsigned int i = 0; i < ids.size(); i++) {
         int id = ids[i];
 
         /// if id is found in neighbors
@@ -1943,7 +1952,7 @@ void runCorrelationClustering(Options& opts, StringVector& args) {
                 break;
             } else if (!cont && jMark < regionCounter) {
                 // replace all regionCounter into jMark
-                for (int k = 0; k < curRegion.size(); k++) {
+                for (unsigned int k = 0; k < curRegion.size(); k++) {
                     markups[curRegion[k]] = jMark;
                 }
                 break;
@@ -1957,7 +1966,7 @@ void runCorrelationClustering(Options& opts, StringVector& args) {
     vtkIntArray* regionArray = vtkIntArray::New();
     regionArray->SetName(outputScalarName.c_str());
     regionArray->SetNumberOfValues(markups.size());
-    for (int i = 0; i < markups.size(); i++) {
+    for (unsigned int i = 0; i < markups.size(); i++) {
         regionArray->SetValue(i, markups[i]);
     }
     inputData->GetPointData()->AddArray(regionArray);

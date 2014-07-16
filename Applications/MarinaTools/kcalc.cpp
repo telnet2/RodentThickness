@@ -12,7 +12,7 @@ using namespace pi;
 
 typedef itk::Image<PIXEL_TYPE,3> ImageType;
 typedef itk::Image<PIXEL_TYPE,2> Image2D;
-ImageIO<ImageType> io;
+ImageIO<ImageType> imgIo;
 std::vector<ImageType::Pointer> inputImages;
 
 int main(int argc, char* argv[]) {
@@ -46,25 +46,25 @@ int main(int argc, char* argv[]) {
 
     if (argParser.GetBool("-2")) {
         cout << "Working on 2D images" << endl;
-        ImageIO<Image2D> io2;
+        ImageIO<Image2D> imgIo2;
         ImageInfo lastImageInfo;
         PixelMathImageFilter<Image2D, Image2D>::Pointer pixelFilter = PixelMathImageFilter<Image2D, Image2D>::New();
         pixelFilter->SetEquation(eq);
-        for (int i = 0; i < args.size(); i++) {
-            pixelFilter->PushBackInput(io2.ReadCastedImage(args[i], lastImageInfo));
+        for (unsigned int i = 0; i < args.size(); i++) {
+            pixelFilter->PushBackInput(imgIo2.ReadCastedImage(args[i], lastImageInfo));
         }
         try {
             pixelFilter->Update();
         } catch (itk::ExceptionObject& e) {
             cout << e.what() << endl;
         }
-        io2.WriteCastedImage(outputFilename, pixelFilter->GetOutput(), lastImageInfo.componenttype);
+        imgIo2.WriteCastedImage(outputFilename, pixelFilter->GetOutput(), lastImageInfo.componenttype);
     } else {
         ImageInfo lastImageInfo;
         PixelMathImageFilter<ImageType, ImageType>::Pointer pixelFilter = PixelMathImageFilter<ImageType, ImageType>::New();
         pixelFilter->SetEquation(eq);
-        for (int i = 0; i < args.size(); i++) {
-            pixelFilter->PushBackInput(io.ReadCastedImage(args[i], lastImageInfo));
+        for (unsigned int i = 0; i < args.size(); i++) {
+            pixelFilter->PushBackInput(imgIo.ReadCastedImage(args[i], lastImageInfo));
         }
         try {
             pixelFilter->Update();
@@ -72,7 +72,7 @@ int main(int argc, char* argv[]) {
             cout << e.what() << endl;
         }
 
-        io.WriteCastedImage(outputFilename, pixelFilter->GetOutput(), lastImageInfo.componenttype);
+        imgIo.WriteCastedImage(outputFilename, pixelFilter->GetOutput(), lastImageInfo.componenttype);
     }
     return 0;
 }
