@@ -352,18 +352,18 @@ def genparamesh(opts, config, data, outputDir):
     if (not file_exists(surfaceLabel)):
       cmd = "%s %s -extractLabel %s -outfile %s" \
         % (pathImageMath, labelmap, opts.ids, surfaceLabel)
-      system.run_process(cmd)
+      system.run_process(cmd,verbose=opts.verbose)
 
     if (not file_exists(segpostLabel)):
       cmd = "%s %s -o %s" \
         % (pathSegPostProcess, surfaceLabel, segpostLabel)
-      system.run_process(cmd)
+      system.run_process(cmd,verbose=opts.verbose)
 
     if (not file_exists(paraFile)):
       num_iters = opts.genparamesh_iter
       cmd = "%s --EulerFile --outEulerName %s %s --iter %d --label %s %s %s" \
           % (pathGenParaMesh, eulerName, segpostLabel, num_iters, 1, paraFile, surfFile)
-      system.run_process(cmd,verbose=True)
+      system.run_process(cmd,verbose=opts.verbose)
 
 
 def paratospharm(opts, config, data, outputDir):
@@ -388,14 +388,14 @@ def paratospharm(opts, config, data, outputDir):
         cmd = "%s %s %s --subdivLevel 10 --spharmDegree 20  %s/%s.ip. --paraOut" % (pathParaToSPHARM, pf, sf, workdir, idlist[idx])
       else:
         cmd = "%s %s %s --subdivLevel 10 --spharmDegree 20  %s/%s.ip. --flipTemplateOn --flipTemplate %s/%s.ip.SPHARM.coef --paraOut" % (pathParaToSPHARM, pf, sf, workdir, idlist[idx], workdir, idlist[idx-1])
-      system.run_process(cmd,verbose=True)
+      system.run_process(cmd,verbose=opts.verbose)
 
     if not file_exists(hm):
       if idx == 0:
         cmd = "%s %s %s --subdivLevel 50 --spharmDegree 20  %s/%s.subj. --paraOut" % (pathParaToSPHARM, pf, sf, workdir, idlist[idx])
       else:
         cmd = "%s %s %s --subdivLevel 50 --spharmDegree 20  %s/%s.subj. --flipTemplateOn --flipTemplate %s/%s.subj.SPHARM.coef --paraOut" % (pathParaToSPHARM, pf, sf, workdir, idlist[idx], workdir, idlist[idx-1])
-      system.run_process(cmd,verbose=True)
+      system.run_process(cmd,verbose=opts.verbose)
       
 
 def precorrespondence(config, data, outputDir, ids):
@@ -586,13 +586,13 @@ if (__name__ == "__main__"):
   parser = OptionParser(usage="usage: %prog dataset.csv config.bms output-directory")
 #  parser.add_option("--labelprocessing", help="preprocessing for label map generation", action="store_true", dest="labelprocessing")
   parser.add_option("--genparamesh", help="generate SPHARM parameter and surface mesh", action="store_true", dest="genparamesh")
-  parser.add_option("--genparamesh-iter", help="set the number of iteration for GenParaMesh", type="int", dest="genparamesh_iter", default=100)
-  parser.add_option("--paratospharm", help="reconstruct surface mesh from PSHARM parameters", action="store_true", dest="paratospharm")
+  parser.add_option("--genparamesh-iter", metavar="NUM", help="set the number of iteration for GenParaMesh (default: 100)", type="int", dest="genparamesh_iter", default=100)
+  parser.add_option("--paratospharm", help="reconstruct surface mesh from SPHARM parameters", action="store_true", dest="paratospharm")
   parser.add_option("--precorrespondence", help="preprocessing for particle correspondence", action="store_true", dest="precorrespondence")
   parser.add_option("--runcorrespondence", help="run particle correspondence", action="store_true", dest="runcorrespondence")
   parser.add_option("--computeThickness", help="compute thickness for a given label", action="store_true", dest="computeThickness")
   parser.add_option("--runstats", help="run statistical analysis", action="store_true", dest="runstats")
-  parser.add_option("--boundaryCorrection", dest="boundaryCorrection", help="Correct boundary conditions more consistent", action="store_true")
+  parser.add_option("--boundary-correction", dest="boundary_correction", help="Correct boundary conditions more consistent", action="store_true")
   parser.add_option("--ids", help="solution label", dest="ids", default="3")
   parser.add_option("--idl", help="low boundary label", dest="idl", default="2")
   parser.add_option("--idh", help="high boundary label", dest="idh", default="1")
@@ -604,8 +604,9 @@ if (__name__ == "__main__"):
   parser.add_option("--regionSplit", help="split the data file with its region (1st column)", dest="regionSplit", action="store_true")
   parser.add_option("--outputPattern", help="Specify the output pattern ex) --outputPattern region_control_%02d.txt", dest="outputPattern")
   parser.add_option("--overwrite", help="specify if the script overwrites previous results", action="store_true", dest="overwrite")
-  parser.add_option("--logFile", help="Specify the filename for logging stdout and stderr outputs", dest="logfileName", default=None)
+  parser.add_option("--log-file", help="Specify the filename for logging stdout and stderr outputs", dest="logfileName", default=None)
   parser.add_option("--log-commands", help="Specify if the script logs only command lines not executing those", action="store_true", dest="log_commands")
+  parser.add_option("--verbose", help="Print out logs to cosnole", action="store_true", dest="verbose", default=False)
 
   (opts, args) = parser.parse_args()
 
@@ -663,6 +664,9 @@ if (__name__ == "__main__"):
       dataGroups.append(csvline[2])
       csvdata.append(csvline) 
 
+    if (opts.verbose):
+      print "Verbose=On"
+
     if (opts.log_commands):
       system.set_log_commands(True)
 
@@ -675,7 +679,7 @@ if (__name__ == "__main__"):
     if (opts.precorrespondence):
       precorrespondence(config, csvdata, outputdir, opts.ids)
 
-    if (opts.boundaryCorrection):
+    if (opts.boundary_correction):
       correctBoundaryConditions(csvdata, config, outputdir)
 
     if (opts.computeThickness):

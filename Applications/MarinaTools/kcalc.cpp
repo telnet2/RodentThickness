@@ -12,7 +12,7 @@ using namespace pi;
 
 typedef itk::Image<PIXEL_TYPE,3> ImageType;
 typedef itk::Image<PIXEL_TYPE,2> Image2D;
-ImageIO<ImageType> io;
+ImageIO<ImageType> imgIo;
 std::vector<ImageType::Pointer> inputImages;
 
 int main(int argc, char* argv[]) {
@@ -64,7 +64,7 @@ int main(int argc, char* argv[]) {
         PixelMathImageFilter<ImageType, ImageType>::Pointer pixelFilter = PixelMathImageFilter<ImageType, ImageType>::New();
         pixelFilter->SetEquation(eq);
         for (int i = 0; i < args.size(); i++) {
-            pixelFilter->PushBackInput(io.ReadCastedImage(args[i], lastImageInfo));
+            pixelFilter->PushBackInput(imgIo.ReadCastedImage(args[i], lastImageInfo));
         }
         try {
             pixelFilter->Update();
@@ -72,7 +72,7 @@ int main(int argc, char* argv[]) {
             cout << e.what() << endl;
         }
 
-        io.WriteCastedImage(outputFilename, pixelFilter->GetOutput(), lastImageInfo.componenttype);
+        imgIo.WriteCastedImage(outputFilename, pixelFilter->GetOutput(), lastImageInfo.componenttype);
     }
     return 0;
 }

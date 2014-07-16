@@ -244,7 +244,7 @@ void runAppendData(Options& opts, StringVector& args) {
     vtkIO io;
 
     // read all files
-    for (int i = 0; i < args.size(); i++) {
+    for (unsigned int i = 0; i < args.size(); i++) {
         vtkPolyData* data = io.readFile(args[i]);
         appender->AddInput(data);
     }
@@ -1338,7 +1338,7 @@ void runAverageScalars(Options& opts, StringVector& args) {
     scalars->SetName(opts.GetString("-outputScalarName").c_str());
     scalars->SetNumberOfValues(inputs[0]->GetNumberOfPoints());
 
-    for (int i = 0; i < args.size(); i++) {
+    for (uint i = 0; i < args.size(); i++) {
         if (i == 0) {
             vtkDataArray* inputScalars = inputs[i]->GetPointData()->GetScalars(opts.GetString("-scalarName").c_str());
             for (int j = 0; j < scalars->GetNumberOfTuples(); j++) {
@@ -1366,7 +1366,7 @@ void runAverageScalars(Options& opts, StringVector& args) {
         }
     }
 
-    for (int i = 0; i < args.size(); i++) {
+    for (uint i = 0; i < args.size(); i++) {
         inputs[i]->GetPointData()->AddArray(scalars);
         cout << "Writing " << args[i] << endl;
         vio.writeFile(args[i], inputs[i]);
@@ -1550,13 +1550,13 @@ void runPCA(Options& opts, StringVector& args) {
     std::vector<vtkPolyData*> inputs;
     inputs.resize(args.size());
     /// - Read a series of vtk files
-    for (int i = 0; i < args.size(); i++) {
+    for (uint i = 0; i < args.size(); i++) {
         inputs[i] = vio.readFile(args[i]);
     }
 
     vtkPCAAnalysisFilter* pcaFilter = vtkPCAAnalysisFilter::New();
     pcaFilter->SetNumberOfInputs(args.size());
-    for (int i = 0; i < args.size(); i++) {
+    for (uint i = 0; i < args.size(); i++) {
         pcaFilter->SetInput(i, inputs[i]);
     }
     pcaFilter->Update();
@@ -1574,7 +1574,8 @@ void runPCA(Options& opts, StringVector& args) {
 
 /// @brief Perform Procrustes alignment
 void runProcrustes(Options& opts, StringVector& args) {
-    int nInputs = args.size() / 2;
+    opts = opts;
+    int nInputs = (int) args.size() / 2;
 
     vtkIO vio;
     vtkProcrustesAlignmentFilter* pros = vtkProcrustesAlignmentFilter::New();
@@ -1585,7 +1586,7 @@ void runProcrustes(Options& opts, StringVector& args) {
     pros->GetLandmarkTransform()->SetModeToSimilarity();
     pros->Update();
 
-    for (int i = nInputs; i < args.size(); i++) {
+    for (uint i = nInputs; i < args.size(); i++) {
         vio.writeFile(args[i], pros->GetOutput(i-nInputs));
     }
 
@@ -1682,7 +1683,7 @@ void runConnectScalars(Options& opts, StringVector& args) {
     std::vector<int> regionRanking;
     regionRanking.resize(regionAreas.size());
 
-    for (int i = 0; i < regionRanking.size(); i++) {
+    for (unsigned int i = 0; i < regionRanking.size(); i++) {
         regionRanking[regionAreas[i].first] = (i+1);
     }
 
@@ -1770,7 +1771,7 @@ void runConnectScalars(Options& opts, StringVector& args) {
 /// @brief Find neighbors of a point
 void extractNeighbors(std::vector<int>& ids, vtkPolyData* data, std::set<int>& neighbors, int nRing) {
     /// for every id in ids
-    for (int i = 0; i < ids.size(); i++) {
+    for (uint i = 0; i < ids.size(); i++) {
         int id = ids[i];
 
         /// if id is found in neighbors
@@ -1943,7 +1944,7 @@ void runCorrelationClustering(Options& opts, StringVector& args) {
                 break;
             } else if (!cont && jMark < regionCounter) {
                 // replace all regionCounter into jMark
-                for (int k = 0; k < curRegion.size(); k++) {
+                for (unsigned int k = 0; k < curRegion.size(); k++) {
                     markups[curRegion[k]] = jMark;
                 }
                 break;
@@ -1957,7 +1958,7 @@ void runCorrelationClustering(Options& opts, StringVector& args) {
     vtkIntArray* regionArray = vtkIntArray::New();
     regionArray->SetName(outputScalarName.c_str());
     regionArray->SetNumberOfValues(markups.size());
-    for (int i = 0; i < markups.size(); i++) {
+    for (unsigned int i = 0; i < markups.size(); i++) {
         regionArray->SetValue(i, markups[i]);
     }
     inputData->GetPointData()->AddArray(regionArray);
@@ -2052,7 +2053,7 @@ void runDetectRidge(Options& opts, StringVector& args) {
         vnl_matrix<double> rotation(3,3);
         vio.rotateVector(normal, northPole, rotation);
 
-        int nNeighbors = neighbors.size();
+        int nNeighbors = (int) neighbors.size();
 
         vnl_matrix<double> U(3*nNeighbors, 7);
         vnl_vector<double> d(3*nNeighbors);
