@@ -23,8 +23,8 @@ ADD_EXECUTABLE(vtktools vtkTools.cxx piOptions.cpp)
 TARGET_LINK_LIBRARIES(vtktools vtkFiltering vtkIO vtkGraphics vtkHybrid)
 
 
-GENERATECLP(main.cxx BinToDistPreprocessing.xml)
-ADD_EXECUTABLE(BinaryToDistanceMap main.cxx BinToDistPreprocessingCLP.h)
+GENERATECLP(BinaryToDist.cxx BinToDistPreprocessing.xml)
+ADD_EXECUTABLE(BinaryToDistanceMap BinaryToDist.cxx BinToDistPreprocessingCLP.h)
 TARGET_LINK_LIBRARIES(BinaryToDistanceMap ${ITK_LIBRARIES})
 
     
