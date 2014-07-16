@@ -17,6 +17,7 @@ std::vector<ImageType::Pointer> inputImages;
 
 int main(int argc, char* argv[]) {
     Options argParser;
+    argParser.addOption("-i", "print image information as ImageStat --info option", SO_NONE);
     argParser.addOption("-e", "The equation to compute each output pixel.", "-e (A+B)", SO_REQ_SEP);
     argParser.addOption("-o", "output filename (the same data type with the last input)", "-o output.nrrd", SO_REQ_SEP);
     argParser.addOption("-h", "print this message", SO_NONE);
@@ -24,6 +25,17 @@ int main(int argc, char* argv[]) {
     StringVector args = argParser.ParseOptions(argc, argv, NULL);
     string eq = argParser.GetString("-e");
     string outputFilename = argParser.GetString("-o");
+
+    if (argParser.GetBool("-i") && args.size() > 0) {
+      ImageInfo lastImageInfo;
+      imgIo.ReadCastedImage(args[0], lastImageInfo);
+      printf("Filename: %s\n", args[0].c_str());
+      printf("Dims: %d %d %d\n", lastImageInfo.dimensions[0], lastImageInfo.dimensions[1], lastImageInfo.dimensions[2]);
+      printf("Pixdims: %.2f %.2f %.2f\n", lastImageInfo.spacing[0], lastImageInfo.spacing[1], lastImageInfo.spacing[2]);
+      printf("Origins: %.2f %.2f %.2f\n", lastImageInfo.origin[0], lastImageInfo.origin[1], lastImageInfo.origin[2]);
+      return 0;
+    }
+
 
     if (argParser.GetBool("-h") || eq == "" || args.size() == 0 || outputFilename == "") {
         cout << "## kcalc usage \n"
@@ -43,27 +55,27 @@ int main(int argc, char* argv[]) {
         cout << endl;
         return 0;
     }
-
+    
     if (argParser.GetBool("-2")) {
         cout << "Working on 2D images" << endl;
-        ImageIO<Image2D> io2;
+        ImageIO<Image2D> imgIo2;
         ImageInfo lastImageInfo;
         PixelMathImageFilter<Image2D, Image2D>::Pointer pixelFilter = PixelMathImageFilter<Image2D, Image2D>::New();
         pixelFilter->SetEquation(eq);
-        for (int i = 0; i < args.size(); i++) {
-            pixelFilter->PushBackInput(io2.ReadCastedImage(args[i], lastImageInfo));
+        for (unsigned int i = 0; i < args.size(); i++) {
+            pixelFilter->PushBackInput(imgIo2.ReadCastedImage(args[i], lastImageInfo));
         }
         try {
             pixelFilter->Update();
         } catch (itk::ExceptionObject& e) {
             cout << e.what() << endl;
         }
-        io2.WriteCastedImage(outputFilename, pixelFilter->GetOutput(), lastImageInfo.componenttype);
+        imgIo2.WriteCastedImage(outputFilename, pixelFilter->GetOutput(), lastImageInfo.componenttype);
     } else {
         ImageInfo lastImageInfo;
         PixelMathImageFilter<ImageType, ImageType>::Pointer pixelFilter = PixelMathImageFilter<ImageType, ImageType>::New();
         pixelFilter->SetEquation(eq);
-        for (int i = 0; i < args.size(); i++) {
+        for (unsigned int i = 0; i < args.size(); i++) {
             pixelFilter->PushBackInput(imgIo.ReadCastedImage(args[i], lastImageInfo));
         }
         try {
