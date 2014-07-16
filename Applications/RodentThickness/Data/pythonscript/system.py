@@ -77,6 +77,12 @@ def run_process(cmdline, loggerName="", verbose=False):
       logger.log(loggingCMDS, cmdline)
       return 0
 
+    # if verbose print the cmdline
+    if verbose:
+      print cmdline
+
+
+    # create the process
     p = Popen(cmd, stdout=PIPE, stderr=PIPE, shell=False)
 
     # log the command line executing

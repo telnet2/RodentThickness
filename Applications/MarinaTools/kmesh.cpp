@@ -1372,7 +1372,11 @@ void runAverageScalars(Options& opts, StringVector& args) {
         }
     }
 
+<<<<<<< HEAD
     for (unsigned int i = 0; i < args.size(); i++) {
+=======
+    for (uint i = 0; i < args.size(); i++) {
+>>>>>>> 45764b140eac58ea50d477a485ec62b0c3de7863
         inputs[i]->GetPointData()->AddArray(scalars);
         cout << "Writing " << args[i] << endl;
         vio.writeFile(args[i], inputs[i]);
@@ -1581,9 +1585,13 @@ void runPCA(Options& opts, StringVector& args) {
 /// @brief Perform Procrustes alignment
 void runProcrustes(Options& opts, StringVector& args) {
     opts = opts;
+<<<<<<< HEAD
     args = args;
 
     int nInputs = args.size() / 2;
+=======
+    int nInputs = (int) args.size() / 2;
+>>>>>>> 45764b140eac58ea50d477a485ec62b0c3de7863
 
     vtkIO vio;
     vtkProcrustesAlignmentFilter* pros = vtkProcrustesAlignmentFilter::New();
@@ -1594,7 +1602,11 @@ void runProcrustes(Options& opts, StringVector& args) {
     pros->GetLandmarkTransform()->SetModeToSimilarity();
     pros->Update();
 
+<<<<<<< HEAD
     for (unsigned int i = nInputs; i < args.size(); i++) {
+=======
+    for (uint i = nInputs; i < args.size(); i++) {
+>>>>>>> 45764b140eac58ea50d477a485ec62b0c3de7863
         vio.writeFile(args[i], pros->GetOutput(i-nInputs));
     }
 
@@ -1779,7 +1791,11 @@ void runConnectScalars(Options& opts, StringVector& args) {
 /// @brief Find neighbors of a point
 void extractNeighbors(std::vector<int>& ids, vtkPolyData* data, std::set<int>& neighbors, int nRing) {
     /// for every id in ids
+<<<<<<< HEAD
     for (unsigned int i = 0; i < ids.size(); i++) {
+=======
+    for (uint i = 0; i < ids.size(); i++) {
+>>>>>>> 45764b140eac58ea50d477a485ec62b0c3de7863
         int id = ids[i];
 
         /// if id is found in neighbors
@@ -2061,7 +2077,7 @@ void runDetectRidge(Options& opts, StringVector& args) {
         vnl_matrix<double> rotation(3,3);
         vio.rotateVector(normal, northPole, rotation);
 
-        int nNeighbors = neighbors.size();
+        int nNeighbors = (int) neighbors.size();
 
         vnl_matrix<double> U(3*nNeighbors, 7);
         vnl_vector<double> d(3*nNeighbors);
