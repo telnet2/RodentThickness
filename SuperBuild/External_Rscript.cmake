@@ -5,6 +5,14 @@ if(${CMAKE_CURRENT_LIST_FILENAME}_FILE_INCLUDED)
 endif()
 set(${CMAKE_CURRENT_LIST_FILENAME}_FILE_INCLUDED 1)
 
+## External_${extProjName}.cmake files can be recurisvely included,
+## and cmake variables are global, so when including sub projects it
+## is important make the extProjName and proj variables
+## appear to stay constant in one of these files.
+## Store global variables before overwriting (then restore at end of this file.)
+ProjectDependancyPush(CACHED_extProjName ${extProjName})
+ProjectDependancyPush(CACHED_proj ${proj})
+
 # Include dependent projects if any
 set(extProjName Rscript) #The find_package known name
 set(proj ${extProjName} ) #This local name
@@ -45,7 +53,6 @@ if(NOT DEFINED ${extProjName}_DIR AND NOT ${USE_SYSTEM_${extProjName}})
   else()
     set(Rscript_DOWNLOAD_ARGS URL "http://cran.cnr.berkeley.edu/src/base/R-2/R-2.15.3.tar.gz" URL_MD5 b2f1a5d701f1f90679be0c60e1931a5c)
   endif()
-message("[] end download Rscript...")
 
   ExternalProject_Add(Rscript # Rscript has no CMakeLists.txt # Example : Slicer/SuperBuild/External_python.cmake
     ${Rscript_DOWNLOAD_ARGS}
@@ -61,7 +68,6 @@ message("[] end download Rscript...")
     BUILD_COMMAND ${CMAKE_COMMAND} -DTOP_BINARY_DIR:PATH=${CMAKE_CURRENT_BINARY_DIR} -P ${CMAKE_CURRENT_SOURCE_DIR}/SuperBuild/InstallRscript.cmake # -DARGNAME:TYPE=VALUE -P <cmake file> = Process script mode
   )
   set(Rscript_DIR ${CMAKE_CURRENT_BINARY_DIR}/Rscript-install)
-message("[] after external Rscript...")
 else()
   if(${USE_SYSTEM_${extProjName}})
     find_package(${extProjName} ${ITK_VERSION_MAJOR} REQUIRED)
@@ -74,5 +80,6 @@ else()
   #SlicerMacroEmptyExternalProject(${proj} "${${proj}_DEPENDENCIES}")
 endif()
 
-list(APPEND ${CMAKE_PROJECT_NAME}_SUPERBUILD_EP_VARS ${extProjName}_DIR:PATH)
+ProjectDependancyPop(CACHED_extProjName extProjName)
+ProjectDependancyPop(CACHED_proj proj)
 

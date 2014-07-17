@@ -73,11 +73,7 @@ namespace pi {
 		ImageIO() {
 			_pixelType = itk::ImageIOBase::SCALAR;
 			_componentType = itk::ImageIOBase::DOUBLE;
-            
-			itk::ObjectFactoryBase::RegisterFactory(itk::NrrdImageIOFactory::New());
-			itk::ObjectFactoryBase::RegisterFactory(itk::NiftiImageIOFactory::New());
-
-            __noverbose = false;
+      __noverbose = false;
 		}
         
 		~ImageIO() {
