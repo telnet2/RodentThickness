@@ -45,5 +45,6 @@ SET (PythonScripts system.py run.py shapeworks.py)
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/shapeworks.py ${Executablebin}/shapeworks.py)
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/system.py ${Executablebin}/system.py)
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/run.py ${Executablebin}/run.py)
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/rodentThicknessStats.r ${Executablebin}/rodentThicknessStats.r)
 
 
