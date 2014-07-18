@@ -29,7 +29,7 @@ TARGET_LINK_LIBRARIES(BinaryToDistanceMap ${ITK_LIBRARIES})
 
     
 ADD_EXECUTABLE(kmesh kmesh.h kmesh.cpp kimage.h kimage.cpp kstreamtracer.h kstreamtracer.cpp piOptions.h piOptions.cpp vtkio.h vtkio.cpp)
-TARGET_LINK_LIBRARIES(kmesh ${VTK_LIBRARIES} ${ITK_LIBRARIES})
+TARGET_LINK_LIBRARIES(kmesh ${VTK_LIBRARIES} ${ITK_LIBRARIES} )
 
 INCLUDE_DIRECTORIES(muparser)
 FILE(GLOB muparser_SRC "muparser/*.cpp")
