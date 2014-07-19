@@ -371,13 +371,15 @@ def labelprocessing(config, csvdata, outputdir, labelNCleft, labelNCright, label
 def compute_thickness(opts, config, data, outputdir, ids, idl, idh):
     pathTool = config["measureThicknessFilterPath"]
     for (id, labelmap, group) in data:
-        workdir = "{outputdir}/Processing/1.MeasurementandSPHARM/{id}".format(**locals())
-        measurementoutput = "{outputdir}/Processing/1.MeasurementandSPHARM/" +\
-                        "{id}_measurementoutput.nrrd".format(**locals())
         #labelmap = "{outputdir}/Processing/1.MeasurementandSPHARM/{id}.boundaryMap.mha".format(**locals())
         # temporary
         #    workdir = "%s/Processing/1.MeasurementandSPHARM/%s_2" % (outputdir, id)
         #    measurementoutput = "%s/Processing/1.MeasurementandSPHARM/%s.thickness.mha" % (outputdir, id)
+
+        workdir = "{outputdir}/Processing/1.MeasurementandSPHARM/{id}".format(**locals())
+        measurementoutput = "{outputdir}/Processing/1.MeasurementandSPHARM/" +\
+                        "{id}_measurementoutput.nrrd"
+        measurementoutput = measurementoutput.format(**locals())
 
         if (not os.path.exists(workdir)):
             os.makedirs(workdir)

@@ -9,8 +9,8 @@
   Copyright (c) Insight Software Consortium. All rights reserved.
   See ITKCopyright.txt or http://www.itk.org/HTML/Copyright.htm for details.
 
-     This software is distributed WITHOUT ANY WARRANTY; without even 
-     the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR 
+     This software is distributed WITHOUT ANY WARRANTY; without even
+     the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
      PURPOSE.  See the above copyright notices for more information.
 
 =========================================================================*/
@@ -22,223 +22,215 @@
 
 #undef _DEBUG_
 
-namespace itk
-{
+namespace itk {
 
 
 template <class TLabelMapImage, class TInputImage>
-void 
+void
 BoundaryStatisticsImageFilter<TLabelMapImage, TInputImage>
 ::SetLabelMapImage(
-  const TLabelMapImage * ptr )
-{
-  this->ProcessObject::SetNthInput( 1, const_cast< TLabelMapImage * >( ptr ) );
+    const TLabelMapImage * ptr ) {
+    this->ProcessObject::SetNthInput( 1, const_cast< TLabelMapImage * >( ptr ) );
 }
 
 template <class TLabelMapImage, class TInputImage>
 const TLabelMapImage *
 BoundaryStatisticsImageFilter<TLabelMapImage, TInputImage>
-::GetLabelMapImage() const
-{
-  return dynamic_cast< const TLabelMapImage * >
-    ( this->ProcessObject::GetInput( 1 ) );
+::GetLabelMapImage() const {
+    return dynamic_cast< const TLabelMapImage * >
+           ( this->ProcessObject::GetInput( 1 ) );
 }
 
 template <class TLabelMapImage, class TInputImage>
 const std::vector<double>&
 BoundaryStatisticsImageFilter<TLabelMapImage, TInputImage>
-::GetStatisticsVector() const
-{
-  return vStatisticsValues;
+::GetStatisticsVector() const {
+    return vStatisticsValues;
 }
 
 template <class TLabelMapImage, class TInputImage>
 BoundaryStatisticsImageFilter<TLabelMapImage, TInputImage>
-::BoundaryStatisticsImageFilter()
-{
+::BoundaryStatisticsImageFilter() {
 
-  this->SetNumberOfRequiredInputs(2);
-  this->m_SolutionDomainId = 5;
-  this->m_DirichletLowId = 2;
-  this->m_DirichletHighId = 3;
+    this->SetNumberOfRequiredInputs(2);
+    this->m_SolutionDomainId = 5;
+    this->m_DirichletLowId = 2;
+    this->m_DirichletHighId = 3;
 
-  this->m_Mean = 0.0;
-  this->m_Std = 0.0;
-  this->m_Max = 0.0;
-  this->m_Min = 0.0;
-  this->m_Volume = 0.0;
-  this->m_NumberOfSurfaceVoxels = 0;
-  this->m_NumberOfVolumeVoxels = 0;
+    this->m_Mean = 0.0;
+    this->m_Std = 0.0;
+    this->m_Max = 0.0;
+    this->m_Min = 0.0;
+    this->m_Volume = 0.0;
+    this->m_NumberOfSurfaceVoxels = 0;
+    this->m_NumberOfVolumeVoxels = 0;
 
 }
 
 template <class TLabelMapImage, class TInputImage>
 void
 BoundaryStatisticsImageFilter<TLabelMapImage, TInputImage>
-::GenerateOutputInformation()
-{
-  Superclass::GenerateOutputInformation();
+::GenerateOutputInformation() {
+    Superclass::GenerateOutputInformation();
 
-  InputImageConstPointer  inputImage  = this->GetInput();
-  OutputImagePointer      outputImage = this->GetOutput();
+    InputImageConstPointer  inputImage  = this->GetInput();
+    OutputImagePointer      outputImage = this->GetOutput();
 
-  outputImage->SetLargestPossibleRegion( inputImage->GetLargestPossibleRegion() );
+    outputImage->SetLargestPossibleRegion( inputImage->GetLargestPossibleRegion() );
 
-  outputImage->SetSpacing(     inputImage->GetSpacing()    );
-  outputImage->SetOrigin(      inputImage->GetOrigin()     );
-  outputImage->SetDirection(   inputImage->GetDirection()  );
+    outputImage->SetSpacing(     inputImage->GetSpacing()    );
+    outputImage->SetOrigin(      inputImage->GetOrigin()     );
+    outputImage->SetDirection(   inputImage->GetDirection()  );
 
 }
-  
+
 template <class TLabelMapImage, class TInputImage>
 void
 BoundaryStatisticsImageFilter<TLabelMapImage, TInputImage>
-::GenerateData()
-{
+::GenerateData() {
 
-  LabelMapImageConstPointer  labelMapImage  = this->GetLabelMapImage();
-  OutputImagePointer      outputImage = this->GetOutput();
-  InputImageConstPointer  inputImage = this->GetInput();
+    LabelMapImageConstPointer  labelMapImage  = this->GetLabelMapImage();
+    OutputImagePointer      outputImage = this->GetOutput();
+    InputImageConstPointer  inputImage = this->GetInput();
 
-  this->m_Mean = 0;
-  double dSquareMean = 0;
-  this->m_NumberOfSurfaceVoxels = 0;
-  this->m_NumberOfVolumeVoxels = 0;
+    this->m_Mean = 0;
+    double dSquareMean = 0;
+    this->m_NumberOfSurfaceVoxels = 0;
+    this->m_NumberOfVolumeVoxels = 0;
 
-  vStatisticsValues.clear();
+    vStatisticsValues.clear();
 
-  RegionType  region = outputImage->GetLargestPossibleRegion();
+    RegionType  region = outputImage->GetLargestPossibleRegion();
 
-  outputImage->SetRegions( region );
-  outputImage->Allocate();
+    outputImage->SetRegions( region );
+    outputImage->Allocate();
 
-  // set the output to zero
+    // set the output to zero
 
-  typedef ImageRegionIterator< TInputImage > ImageRegionIterator;
-  ImageRegionIterator outputItr( outputImage, region );
+    typedef ImageRegionIterator< TInputImage > ImageRegionIterator;
+    ImageRegionIterator outputItr( outputImage, region );
 
-  for ( outputItr.GoToBegin(); !outputItr.IsAtEnd(); ++outputItr ) {
-    outputItr.Set( 0 );
-  }
-  
-  // loop over the labelmap and search for solution domain voxels
-  // that are adjacent to boundary values
-  // put the used values in the output image (so this can easily be used in slicer to compute statistics)
+    for ( outputItr.GoToBegin(); !outputItr.IsAtEnd(); ++outputItr ) {
+        outputItr.Set( 0 );
+    }
 
-  RadiusType radius;
-  radius.Fill( 1 );
+    // loop over the labelmap and search for solution domain voxels
+    // that are adjacent to boundary values
+    // put the used values in the output image (so this can easily be used in slicer to compute statistics)
 
-  ConstLabelMapNeighborhoodIteratorType inN( radius, labelMapImage, labelMapImage->GetLargestPossibleRegion() );
+    RadiusType radius;
+    radius.Fill( 1 );
 
-  for ( inN.GoToBegin(); !inN.IsAtEnd(); ++inN ) {
+    ConstLabelMapNeighborhoodIteratorType inN( radius, labelMapImage, labelMapImage->GetLargestPossibleRegion() );
 
-    LabelMapPixelType cPixel = inN.GetCenterPixel();
+    for ( inN.GoToBegin(); !inN.IsAtEnd(); ++inN ) {
 
-    if ( cPixel==m_SolutionDomainId ) {
+        LabelMapPixelType cPixel = inN.GetCenterPixel();
 
-      this->m_NumberOfVolumeVoxels++;
+        if ( cPixel==m_SolutionDomainId ) {
 
-      // check if there is a 2d neighbor that is a BC id
+            this->m_NumberOfVolumeVoxels++;
 
-      IndexType currentIndex = inN.GetIndex();
-      PixelType currentVal = inputImage->GetPixel( currentIndex );
+            // check if there is a 2d neighbor that is a BC id
 
-      int iFoundDirichletLow = 0;
-      int iFoundDirichletHigh = 0;
+            IndexType currentIndex = inN.GetIndex();
+            PixelType currentVal = inputImage->GetPixel( currentIndex );
 
-      for ( int iI=0; iI<InputImageDimension; iI++ ) {
+            int iFoundDirichletLow = 0;
+            int iFoundDirichletHigh = 0;
 
-	IndexType indexM = currentIndex;
-	indexM[ iI ]--;
+            for ( int iI=0; iI<InputImageDimension; iI++ ) {
 
-	LabelMapPixelType cPixelM = inN.GetPrevious( iI, 1 );
+                IndexType indexM = currentIndex;
+                indexM[ iI ]--;
 
-	if ( cPixelM==m_DirichletLowId ) iFoundDirichletLow++;
-	if ( cPixelM==m_DirichletHighId ) iFoundDirichletHigh++;
+                LabelMapPixelType cPixelM = inN.GetPrevious( iI, 1 );
 
-	IndexType indexP = currentIndex;
-	indexP[ iI ]++;
-	
-	LabelMapPixelType cPixelP = inN.GetNext( iI, 1 );
+                if ( cPixelM==m_DirichletLowId ) iFoundDirichletLow++;
+                if ( cPixelM==m_DirichletHighId ) iFoundDirichletHigh++;
 
-	if ( cPixelP==m_DirichletLowId ) iFoundDirichletLow++;
-	if ( cPixelP==m_DirichletHighId ) iFoundDirichletHigh++;
+                IndexType indexP = currentIndex;
+                indexP[ iI ]++;
 
-      }
+                LabelMapPixelType cPixelP = inN.GetNext( iI, 1 );
 
-      if ( iFoundDirichletLow && iFoundDirichletHigh ) {
+                if ( cPixelP==m_DirichletLowId ) iFoundDirichletLow++;
+                if ( cPixelP==m_DirichletHighId ) iFoundDirichletHigh++;
 
-	if ( this->m_NumberOfSurfaceVoxels==0 ) {
-	  this->m_Min = currentVal;
-	  this->m_Max = currentVal;
-	} else {
-	  if (this->m_Min>currentVal) this->m_Min = currentVal;
-	  if (this->m_Max<currentVal) this->m_Max = currentVal;
-	}
+            }
 
-	outputImage->SetPixel( currentIndex, currentVal);
-	this->m_Mean+= 2*currentVal;
-	dSquareMean+= 2*pow(currentVal,2);
-	this->m_NumberOfSurfaceVoxels+=2;	
+            if ( iFoundDirichletLow && iFoundDirichletHigh ) {
 
-	vStatisticsValues.push_back( currentVal );
-	vStatisticsValues.push_back( currentVal );
+                if ( this->m_NumberOfSurfaceVoxels==0 ) {
+                    this->m_Min = currentVal;
+                    this->m_Max = currentVal;
+                } else {
+                    if (this->m_Min>currentVal) this->m_Min = currentVal;
+                    if (this->m_Max<currentVal) this->m_Max = currentVal;
+                }
 
-      } else if ( iFoundDirichletLow || iFoundDirichletHigh ) {
+                outputImage->SetPixel( currentIndex, currentVal);
+                this->m_Mean+= 2*currentVal;
+                dSquareMean+= 2*pow(currentVal,2);
+                this->m_NumberOfSurfaceVoxels+=2;
 
-	if ( this->m_NumberOfSurfaceVoxels==0 ) {
-	  this->m_Min = currentVal;
-	  this->m_Max = currentVal;
-	} else {
-	  if (this->m_Min>currentVal) this->m_Min = currentVal;
-	  if (this->m_Max<currentVal) this->m_Max = currentVal;
-	}
+                vStatisticsValues.push_back( currentVal );
+                vStatisticsValues.push_back( currentVal );
 
-	outputImage->SetPixel( currentIndex, currentVal);
-	this->m_Mean+= currentVal;
-	dSquareMean+= pow(currentVal,2);
-	this->m_NumberOfSurfaceVoxels++;	
+            } else if ( iFoundDirichletLow || iFoundDirichletHigh ) {
 
-	vStatisticsValues.push_back( currentVal );
+                if ( this->m_NumberOfSurfaceVoxels==0 ) {
+                    this->m_Min = currentVal;
+                    this->m_Max = currentVal;
+                } else {
+                    if (this->m_Min>currentVal) this->m_Min = currentVal;
+                    if (this->m_Max<currentVal) this->m_Max = currentVal;
+                }
 
-      }
+                outputImage->SetPixel( currentIndex, currentVal);
+                this->m_Mean+= currentVal;
+                dSquareMean+= pow(currentVal,2);
+                this->m_NumberOfSurfaceVoxels++;
+
+                vStatisticsValues.push_back( currentVal );
+
+            }
+
+        }
 
     }
 
-  }
+    this->m_Mean/=this->m_NumberOfSurfaceVoxels;
+    dSquareMean/=this->m_NumberOfSurfaceVoxels;
 
-  this->m_Mean/=this->m_NumberOfSurfaceVoxels;
-  dSquareMean/=this->m_NumberOfSurfaceVoxels;
-  
-  double dVariance = dSquareMean-pow(this->m_Mean,2);
-  this->m_Std = sqrt(dVariance);
-  
-  const itk::Vector<double, InputImageDimension> spacing = this->GetInput()->GetSpacing();
+    double dVariance = dSquareMean-pow(this->m_Mean,2);
+    this->m_Std = sqrt(dVariance);
 
-  this->m_Volume = this->m_NumberOfVolumeVoxels;
+    const itk::Vector<double, InputImageDimension> spacing = this->GetInput()->GetSpacing();
 
-  for ( int iI=0; iI<InputImageDimension; iI++ ) {
-    this->m_Volume*=spacing[iI];
-  }
+    this->m_Volume = this->m_NumberOfVolumeVoxels;
+
+    for ( int iI=0; iI<InputImageDimension; iI++ ) {
+        this->m_Volume*=spacing[iI];
+    }
 
 }
 
- 
+
 
 /**
  *
  */
 template <class TLabelMapImage, class TInputImage>
-void 
+void
 BoundaryStatisticsImageFilter<TLabelMapImage, TInputImage>
-::PrintSelf(std::ostream& os, Indent indent) const
-{
-  Superclass::PrintSelf(os,indent);
+::PrintSelf(std::ostream& os, Indent indent) const {
+    Superclass::PrintSelf(os,indent);
 }
 
- 
 
-  
+
+
 } // end namespace itk
 
 #endif

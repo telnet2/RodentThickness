@@ -9,8 +9,8 @@
   Copyright (c) Insight Software Consortium. All rights reserved.
   See ITKCopyright.txt or http://www.itk.org/HTML/Copyright.htm for details.
 
-     This software is distributed WITHOUT ANY WARRANTY; without even 
-     the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR 
+     This software is distributed WITHOUT ANY WARRANTY; without even
+     the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
      PURPOSE.  See the above copyright notices for more information.
 
 =========================================================================*/
@@ -35,187 +35,181 @@ namespace itk {
 
 template <class TInputImage, class TCovariantVectorImage, class TLabelImage, class TOutputImage>
 class ITK_EXPORT TransportImageFilterRestrictedDomain
-  : public DenseFiniteDifferenceImageFilter<TInputImage, TOutputImage>
-{
+    : public DenseFiniteDifferenceImageFilter<TInputImage, TOutputImage> {
 public:
-  /** Standard class typedefs. */
-  typedef TransportImageFilterRestrictedDomain Self;
-  typedef DenseFiniteDifferenceImageFilter<TInputImage, TOutputImage> Superclass;
-  typedef SmartPointer<Self> Pointer;
-  typedef SmartPointer<const Self> ConstPointer;
-  typedef typename Superclass::PixelType  PixelType;
-  typedef                      PixelType  ScalarValueType;
-  typedef typename TCovariantVectorImage::PixelType VectorPixelType;
+    /** Standard class typedefs. */
+    typedef TransportImageFilterRestrictedDomain Self;
+    typedef DenseFiniteDifferenceImageFilter<TInputImage, TOutputImage> Superclass;
+    typedef SmartPointer<Self> Pointer;
+    typedef SmartPointer<const Self> ConstPointer;
+    typedef typename Superclass::PixelType  PixelType;
+    typedef                      PixelType  ScalarValueType;
+    typedef typename TCovariantVectorImage::PixelType VectorPixelType;
 
-  typedef typename TInputImage::SpacingType SpacingType;
-  typedef typename Superclass::TimeStepType TimeStepType;
+    typedef typename TInputImage::SpacingType SpacingType;
+    typedef typename Superclass::TimeStepType TimeStepType;
 
-  typedef typename itk::ImageRegionConstIterator< TOutputImage > ConstIteratorType;
+    typedef typename itk::ImageRegionConstIterator< TOutputImage > ConstIteratorType;
 
-  /** Extract superclass image dimension. */
-  itkStaticConstMacro(ImageDimension, unsigned int,
-                      Superclass::ImageDimension);
+    /** Extract superclass image dimension. */
+    itkStaticConstMacro(ImageDimension, unsigned int,
+                        Superclass::ImageDimension);
 
-  /** Standard method for creation through object factory. */
-  itkNewMacro(Self);
+    /** Standard method for creation through object factory. */
+    itkNewMacro(Self);
 
-  /** Run-time information. */
-  itkTypeMacro(TransportImageFilterRestrictedDomain,
-               DenseFiniteDifferenceImageFilter);
-  
-  itkSetMacro( TerminalTime, TimeStepType );
-  itkGetMacro( TerminalTime, TimeStepType );
+    /** Run-time information. */
+    itkTypeMacro(TransportImageFilterRestrictedDomain,
+                 DenseFiniteDifferenceImageFilter);
 
-  void SetIntegrationConstant( const ScalarValueType &v )
-  {
-    m_IntegrationConstant = v;
-    m_TransportFunctionRestrictedDomain->SetIntegrationConstant( v );
-  }
+    itkSetMacro( TerminalTime, TimeStepType );
+    itkGetMacro( TerminalTime, TimeStepType );
 
-  const ScalarValueType &GetIntegrationConstant()
-  {
-    return m_IntegrationConstant;
-  }
+    void SetIntegrationConstant( const ScalarValueType &v ) {
+        m_IntegrationConstant = v;
+        m_TransportFunctionRestrictedDomain->SetIntegrationConstant( v );
+    }
 
-  void SetNeumannId( const int &i )
-  {
-    m_NeumannId = i;
-    m_TransportFunctionRestrictedDomain->SetNeumannId( i );
-  }
+    const ScalarValueType &GetIntegrationConstant() {
+        return m_IntegrationConstant;
+    }
 
-  const int &GetNeumannId()
-  {
-    return m_NeumannId;
-  }
+    void SetNeumannId( const int &i ) {
+        m_NeumannId = i;
+        m_TransportFunctionRestrictedDomain->SetNeumannId( i );
+    }
 
-  void SetSolutionDomainId( const int &i )
-  {
-    m_SolutionDomainId = i;
-    m_TransportFunctionRestrictedDomain->SetSolutionDomainId( i );
-  }
+    const int &GetNeumannId() {
+        return m_NeumannId;
+    }
 
-  const int &GetSolutionDomainId()
-  {
-    return m_SolutionDomainId;
-  }
+    void SetSolutionDomainId( const int &i ) {
+        m_SolutionDomainId = i;
+        m_TransportFunctionRestrictedDomain->SetSolutionDomainId( i );
+    }
 
-  void SetTargetId( const int &i )
-  {
-    m_TargetId = i;
-    m_TransportFunctionRestrictedDomain->SetTargetId( i );
-  }
+    const int &GetSolutionDomainId() {
+        return m_SolutionDomainId;
+    }
 
-  const int &GetTargetId()
-  {
-    return m_TargetId;
-  }
+    void SetTargetId( const int &i ) {
+        m_TargetId = i;
+        m_TransportFunctionRestrictedDomain->SetTargetId( i );
+    }
 
-  void SetOriginId( const int &i )
-  {
-    m_OriginId = i;
-    m_TransportFunctionRestrictedDomain->SetOriginId( i );
-  }
+    const int &GetTargetId() {
+        return m_TargetId;
+    }
 
-  const int &GetOriginId()
-  {
-    return m_OriginId;
-  }
+    void SetOriginId( const int &i ) {
+        m_OriginId = i;
+        m_TransportFunctionRestrictedDomain->SetOriginId( i );
+    }
 
-  void SetTimeStep(const TimeStepType &t)
-  { m_TimeStep = t; }
+    const int &GetOriginId() {
+        return m_OriginId;
+    }
 
-  const TimeStepType &GetTimeStep() const
-  { return m_TimeStep; }
+    void SetTimeStep(const TimeStepType &t) {
+        m_TimeStep = t;
+    }
 
-  void SetSpacing( const SpacingType st )
-  {
-    this->m_Spacing = st;
-    this->GetDifferenceFunction()->SetSpacing( this->m_Spacing );
-  }
+    const TimeStepType &GetTimeStep() const {
+        return m_TimeStep;
+    }
 
-  SpacingType & GetSpacing()
-  {
-    return this->m_Spacing;
-  }
+    void SetSpacing( const SpacingType st ) {
+        this->m_Spacing = st;
+        this->GetDifferenceFunction()->SetSpacing( this->m_Spacing );
+    }
 
-  void SetAdaptiveTimeStep(const bool &t)
-  { m_TransportFunctionRestrictedDomain->SetAdaptiveTimeStep( t ); }
+    SpacingType & GetSpacing() {
+        return this->m_Spacing;
+    }
 
-  const TimeStepType &GetAdaptiveTimeStep() const
-  { return m_TransportFunctionRestrictedDomain->GetAdaptiveTimeStep(); }
+    void SetAdaptiveTimeStep(const bool &t) {
+        m_TransportFunctionRestrictedDomain->SetAdaptiveTimeStep( t );
+    }
 
-  void AdaptiveTimeStepOn()
-  { m_TransportFunctionRestrictedDomain->AdaptiveTimeStepOn(); }
+    const TimeStepType &GetAdaptiveTimeStep() const {
+        return m_TransportFunctionRestrictedDomain->GetAdaptiveTimeStep();
+    }
 
-  void AdaptiveTimeStepOff()
-  { m_TransportFunctionRestrictedDomain->AdaptiveTimeStepOff(); }
+    void AdaptiveTimeStepOn() {
+        m_TransportFunctionRestrictedDomain->AdaptiveTimeStepOn();
+    }
 
-  virtual void ApplyUpdate(const TimeStepType& dt);
+    void AdaptiveTimeStepOff() {
+        m_TransportFunctionRestrictedDomain->AdaptiveTimeStepOff();
+    }
 
-  virtual void SetFlowField( const TCovariantVectorImage *FlowField) 
-  { 
-    this->SetNthInput(1, const_cast<TCovariantVectorImage *>( FlowField )); 
-    m_TransportFunctionRestrictedDomain->SetFlowField( FlowField ); 
-  }
+    virtual void ApplyUpdate(const TimeStepType& dt);
 
-  const TCovariantVectorImage* GetFlowField(void) { return this->m_TransportFunctionRestrictedDomain->GetFlowField(); }
-  virtual void SetLabelImage( const TLabelImage *LabelImage)
-  {
-    this->SetNthInput(2, const_cast<TLabelImage *>( LabelImage ) );
-    m_TransportFunctionRestrictedDomain->SetLabelImage( LabelImage );
-  }
-  
-  const TLabelImage* GetLabelImage(void) { return this->m_TransportFunctionRestrictedDomain->GetLabelImage(); }
+    virtual void SetFlowField( const TCovariantVectorImage *FlowField) {
+        this->SetNthInput(1, const_cast<TCovariantVectorImage *>( FlowField ));
+        m_TransportFunctionRestrictedDomain->SetFlowField( FlowField );
+    }
+
+    const TCovariantVectorImage* GetFlowField(void) {
+        return this->m_TransportFunctionRestrictedDomain->GetFlowField();
+    }
+    virtual void SetLabelImage( const TLabelImage *LabelImage) {
+        this->SetNthInput(2, const_cast<TLabelImage *>( LabelImage ) );
+        m_TransportFunctionRestrictedDomain->SetLabelImage( LabelImage );
+    }
+
+    const TLabelImage* GetLabelImage(void) {
+        return this->m_TransportFunctionRestrictedDomain->GetLabelImage();
+    }
 
 
-  /** Supplies the halting criteria for this class of filters.  The
-   * algorithm will stop after a user-specified number of iterations. */
-  virtual bool Halt()
-  {
+    /** Supplies the halting criteria for this class of filters.  The
+     * algorithm will stop after a user-specified number of iterations. */
+    virtual bool Halt() {
 
-    std::cout << "time = " << m_CurrentTime << std::endl;
+        std::cout << "time = " << m_CurrentTime << std::endl;
 
-    return ( m_NeedsToHalt );
-  }
-  
-  /** Extract superclass information. */
-  typedef typename Superclass::UpdateBufferType UpdateBufferType;
-  
+        return ( m_NeedsToHalt );
+    }
+
+    /** Extract superclass information. */
+    typedef typename Superclass::UpdateBufferType UpdateBufferType;
+
 #ifdef ITK_USE_CONCEPT_CHECKING
-  /** Begin concept checking */
-  itkConceptMacro(OutputHasNumericTraitsCheck,
-    (Concept::HasNumericTraits<typename TOutputImage::PixelType>));
-  /** End concept checking */
+    /** Begin concept checking */
+    itkConceptMacro(OutputHasNumericTraitsCheck,
+                    (Concept::HasNumericTraits<typename TOutputImage::PixelType>));
+    /** End concept checking */
 #endif
 
 protected:
-  TransportImageFilterRestrictedDomain();
-  ~TransportImageFilterRestrictedDomain() {}
-  void PrintSelf(std::ostream& os, Indent indent) const;
+    TransportImageFilterRestrictedDomain();
+    ~TransportImageFilterRestrictedDomain() {}
+    void PrintSelf(std::ostream& os, Indent indent) const;
 
-  virtual void Initialize();
-  void PreInitialize();
-  virtual void InitializeIteration();
-  //void BeforeThreadedGenerateData();
-  
+    virtual void Initialize();
+    void PreInitialize();
+    virtual void InitializeIteration();
+    //void BeforeThreadedGenerateData();
+
 private:
-  TransportImageFilterRestrictedDomain(const Self&); //purposely not implemented
-  void operator=(const Self&); //purposely not implemented
+    TransportImageFilterRestrictedDomain(const Self&); //purposely not implemented
+    void operator=(const Self&); //purposely not implemented
 
-  TimeStepType m_TimeStep;
-  TimeStepType m_TerminalTime;
-  TimeStepType m_CurrentTime;
-  TimeStepType m_TerminalTimeFactor;
-  bool m_NeedsToHalt;
+    TimeStepType m_TimeStep;
+    TimeStepType m_TerminalTime;
+    TimeStepType m_CurrentTime;
+    TimeStepType m_TerminalTimeFactor;
+    bool m_NeedsToHalt;
 
-  int m_OriginId;
-  int m_TargetId;
-  double m_IntegrationConstant;
-  int m_SolutionDomainId;
-  int m_NeumannId;
+    int m_OriginId;
+    int m_TargetId;
+    double m_IntegrationConstant;
+    int m_SolutionDomainId;
+    int m_NeumannId;
 
-  SpacingType m_Spacing;
-  TransportFunctionRestrictedDomain<UpdateBufferType,TCovariantVectorImage,TLabelImage> *m_TransportFunctionRestrictedDomain;
+    SpacingType m_Spacing;
+    TransportFunctionRestrictedDomain<UpdateBufferType,TCovariantVectorImage,TLabelImage> *m_TransportFunctionRestrictedDomain;
 };
 
 } // end namspace itk

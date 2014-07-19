@@ -9,8 +9,8 @@
   Copyright (c) Insight Software Consortium. All rights reserved.
   See ITKCopyright.txt or http://www.itk.org/HTML/Copyright.htm for details.
 
-     This software is distributed WITHOUT ANY WARRANTY; without even 
-     the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR 
+     This software is distributed WITHOUT ANY WARRANTY; without even
+     the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
      PURPOSE.  See the above copyright notices for more information.
 
 =========================================================================*/
@@ -20,80 +20,75 @@
 #include "itkUnaryFunctorImageFilter.h"
 #include "itkConceptChecking.h"
 
-namespace itk
-{
-  
+namespace itk {
+
 /** \class NegateVectorImageFilter
  * \brief Computes the ABS(x) pixel-wise
- * 
+ *
  * \ingroup IntensityImageFilters  Multithreaded
  */
 
-namespace Functor {  
-  
+namespace Functor {
+
 template< class TInput, class TOutput>
-class NegateVector
-{
+class NegateVector {
 public:
-  NegateVector() {}
-  ~NegateVector() {}
-  bool operator!=( const NegateVector & ) const
-  {
-    return false;
-  }
-  bool operator==( const NegateVector & other ) const
-  {
-    return !(*this != other);
-  }
-  inline TOutput operator()( const TInput & A ) const
-  {
-    typedef typename TOutput::ValueType OutputValueType;
+    NegateVector() {}
+    ~NegateVector() {}
+    bool operator!=( const NegateVector & ) const {
+        return false;
+    }
+    bool operator==( const NegateVector & other ) const {
+        return !(*this != other);
+    }
+    inline TOutput operator()( const TInput & A ) const {
+        typedef typename TOutput::ValueType OutputValueType;
 
-    TOutput value;
+        TOutput value;
 
-    for( unsigned int k = 0; k < TOutput::Dimension; k++ )
-      { value[k] = static_cast<OutputValueType>( -A[k] ); }
-    return value;
-  }
-}; 
+        for( unsigned int k = 0; k < TOutput::Dimension; k++ ) {
+            value[k] = static_cast<OutputValueType>( -A[k] );
+        }
+        return value;
+    }
+};
 }
 
 template <class TInputImage, class TOutputImage>
 class ITK_EXPORT NegateVectorImageFilter :
     public
-UnaryFunctorImageFilter<TInputImage,TOutputImage, 
-                        Functor::NegateVector< 
-  typename TInputImage::PixelType, 
-  typename TOutputImage::PixelType>   >
-{
+    UnaryFunctorImageFilter<TInputImage,TOutputImage,
+    Functor::NegateVector<
+    typename TInputImage::PixelType,
+    typename TOutputImage::PixelType>   > {
 public:
-  /** Standard class typedefs. */
-  typedef NegateVectorImageFilter  Self;
-  typedef UnaryFunctorImageFilter<TInputImage,TOutputImage, 
-                                  Functor::NegateVector< typename TInputImage::PixelType, 
-                                                 typename TOutputImage::PixelType> >  Superclass;
-  typedef SmartPointer<Self>   Pointer;
-  typedef SmartPointer<const Self>  ConstPointer;
+    /** Standard class typedefs. */
+    typedef NegateVectorImageFilter  Self;
+    typedef UnaryFunctorImageFilter<TInputImage,TOutputImage,
+            Functor::NegateVector< typename TInputImage::PixelType,
+            typename TOutputImage::PixelType> >  Superclass;
+    typedef SmartPointer<Self>   Pointer;
+    typedef SmartPointer<const Self>  ConstPointer;
 
 
-  /** Method for creation through the object factory. */
-  itkNewMacro(Self);
+    /** Method for creation through the object factory. */
+    itkNewMacro(Self);
 
 #ifdef ITK_USE_CONCEPT_CHECKING
-  /** Begin concept checking */
-  itkConceptMacro(ConvertibleCheck,
-    (Concept::Convertible<typename TInputImage::PixelType,
-                          typename TOutputImage::PixelType>));
-  /** End concept checking */
+    /** Begin concept checking */
+    itkConceptMacro(ConvertibleCheck,
+                    (Concept::Convertible<typename TInputImage::PixelType,
+                     typename TOutputImage::PixelType>));
+    /** End concept checking */
 #endif
 
 protected:
-  NegateVectorImageFilter() {}
-  virtual ~NegateVectorImageFilter() {}
+    NegateVectorImageFilter() {}
+    virtual ~NegateVectorImageFilter() {}
 
 private:
-  NegateVectorImageFilter(const Self&); //purposely not implemented
-  void operator=(const Self&); //purposely not implemented
+    NegateVectorImageFilter(const Self&); //purposely not implemented
+    void operator=(const Self&); //purposely not implemented
 
 };
 

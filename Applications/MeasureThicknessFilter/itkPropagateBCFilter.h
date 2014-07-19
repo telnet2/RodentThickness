@@ -9,8 +9,8 @@
   Copyright (c) Insight Software Consortium. All rights reserved.
   See ITKCopyright.txt or http://www.itk.org/HTML/Copyright.htm for details.
 
-     This software is distributed WITHOUT ANY WARRANTY; without even 
-     the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR 
+     This software is distributed WITHOUT ANY WARRANTY; without even
+     the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
      PURPOSE.  See the above copyright notices for more information.
 
 =========================================================================*/
@@ -29,133 +29,130 @@
 #include <set>
 #include <itkImageToImageFilter.h>
 
-namespace itk
-{
+namespace itk {
 
 /** \class PropagateBCFilter
- * \brief 
- *        
- * 
+ * \brief
+ *
+ *
  */
-  template <typename TInputImage > 
+template <typename TInputImage >
 class ITK_EXPORT PropagateBCFilter:
-    public ImageToImageFilter<TInputImage,TInputImage>
-{
+    public ImageToImageFilter<TInputImage,TInputImage> {
 public:
-  /** Standard class typedefs. */
-  typedef PropagateBCFilter  Self;
-  typedef ImageToImageFilter<TInputImage,TInputImage> Superclass;
-  typedef SmartPointer<Self>                   Pointer;
-  typedef SmartPointer<const Self>        ConstPointer;
-  
-  
-  /** Pixel Type of the input image */
-  typedef TInputImage                                    ImageType;
-
-  typedef typename TInputImage::PixelType                PixelType;
-  typedef typename NumericTraits<PixelType>::RealType    RealType;
-  typedef typename NumericTraits<PixelType>::ScalarRealType ScalarRealType;
-
-  typedef typename TInputImage::RegionType      RegionType;
-  typedef typename TInputImage::SizeType      SizeType;
-  typedef typename TInputImage::IndexType       IndexType;
-  typedef typename TInputImage::OffsetType       OffsetType;
-  
-
-  typedef typename itk::ImageRegionIterator< TInputImage > ImageRegionIteratorType;
-  typedef typename itk::ImageRegionConstIterator< TInputImage > ImageRegionConstIteratorType;
-  typedef typename itk::NeighborhoodIterator< TInputImage > ImageNeighborhoodIteratorType;
-  typedef typename itk::ConstNeighborhoodIterator< TInputImage > ImageConstNeighborhoodIteratorType;
-  typedef typename ImageNeighborhoodIteratorType::RadiusType RadiusType;
+    /** Standard class typedefs. */
+    typedef PropagateBCFilter  Self;
+    typedef ImageToImageFilter<TInputImage,TInputImage> Superclass;
+    typedef SmartPointer<Self>                   Pointer;
+    typedef SmartPointer<const Self>        ConstPointer;
 
 
-  /** Image dimension. */
-  itkStaticConstMacro(ImageDimension, unsigned int,
-                      TInputImage::ImageDimension);
+    /** Pixel Type of the input image */
+    typedef TInputImage                                    ImageType;
+
+    typedef typename TInputImage::PixelType                PixelType;
+    typedef typename NumericTraits<PixelType>::RealType    RealType;
+    typedef typename NumericTraits<PixelType>::ScalarRealType ScalarRealType;
+
+    typedef typename TInputImage::RegionType      RegionType;
+    typedef typename TInputImage::SizeType      SizeType;
+    typedef typename TInputImage::IndexType       IndexType;
+    typedef typename TInputImage::OffsetType       OffsetType;
 
 
-  typedef typename itk::Image< double, ImageDimension > DoubleImageType;
-  typedef typename DoubleImageType::Pointer DoubleImagePointer;
-  typedef typename itk::ImageRegionIterator< DoubleImageType > DoubleImageRegionIteratorType;
-  typedef typename itk::ImageRegionConstIterator< DoubleImageType > DoubleImageRegionConstIteratorType;
+    typedef typename itk::ImageRegionIterator< TInputImage > ImageRegionIteratorType;
+    typedef typename itk::ImageRegionConstIterator< TInputImage > ImageRegionConstIteratorType;
+    typedef typename itk::NeighborhoodIterator< TInputImage > ImageNeighborhoodIteratorType;
+    typedef typename itk::ConstNeighborhoodIterator< TInputImage > ImageConstNeighborhoodIteratorType;
+    typedef typename ImageNeighborhoodIteratorType::RadiusType RadiusType;
 
-  /** Define the image type for internal computations 
-      RealType is usually 'double' in NumericTraits. 
-      Here we prefer float in order to save memory.  */
 
-  typedef typename NumericTraits< PixelType >::FloatType   InternalRealType;
-  typedef Image<InternalRealType, 
-                itkGetStaticConstMacro(ImageDimension) >   RealImageType;
+    /** Image dimension. */
+    itkStaticConstMacro(ImageDimension, unsigned int,
+                        TInputImage::ImageDimension);
 
-  /**  Pointer to the Output Image */
-  typedef typename ImageType::Pointer            ImagePointer;                                  
-  typedef typename ImageType::ConstPointer       ImageConstPointer;
 
-  /** Method for creation through the object factory. */
-  itkNewMacro(Self);
+    typedef typename itk::Image< double, ImageDimension > DoubleImageType;
+    typedef typename DoubleImageType::Pointer DoubleImagePointer;
+    typedef typename itk::ImageRegionIterator< DoubleImageType > DoubleImageRegionIteratorType;
+    typedef typename itk::ImageRegionConstIterator< DoubleImageType > DoubleImageRegionConstIteratorType;
 
-  itkGetMacro( DirichletLowId, int);
-  itkSetMacro( DirichletLowId, int);
+    /** Define the image type for internal computations
+        RealType is usually 'double' in NumericTraits.
+        Here we prefer float in order to save memory.  */
 
-  itkGetMacro( DirichletHighId, int);
-  itkSetMacro( DirichletHighId, int);
+    typedef typename NumericTraits< PixelType >::FloatType   InternalRealType;
+    typedef Image<InternalRealType,
+            itkGetStaticConstMacro(ImageDimension) >   RealImageType;
 
-  itkGetMacro( NeumannId, int);
-  itkSetMacro( NeumannId, int);
+    /**  Pointer to the Output Image */
+    typedef typename ImageType::Pointer            ImagePointer;
+    typedef typename ImageType::ConstPointer       ImageConstPointer;
 
-  itkGetMacro( DirichletMeanId, int);
-  itkSetMacro( DirichletMeanId, int);
+    /** Method for creation through the object factory. */
+    itkNewMacro(Self);
 
-  itkGetMacro( SolutionDomainId, int);
-  itkSetMacro( SolutionDomainId, int);
+    itkGetMacro( DirichletLowId, int);
+    itkSetMacro( DirichletLowId, int);
 
-  itkGetMacro( BoundaryConditionToDetermineId, int);
-  itkSetMacro( BoundaryConditionToDetermineId, int);
+    itkGetMacro( DirichletHighId, int);
+    itkSetMacro( DirichletHighId, int);
 
-  itkGetMacro( NumberOfIterations, int);
-  itkSetMacro( NumberOfIterations, int);
-  
-  itkGetMacro( KernelWidth, double );
-  itkSetMacro( KernelWidth, double );
+    itkGetMacro( NeumannId, int);
+    itkSetMacro( NeumannId, int);
 
-  
-  struct globalIndxLtFcn {
-    bool operator()( const IndexType& o1,  const IndexType& o2 ) const
-    {
-      
-      for ( int iI=0; iI<ImageDimension; iI++ ) {
-	if ( o1[iI]<o2[iI] ) return 1;
-	if ( o1[iI]>o2[iI] ) return 0;
-      }
-      return 0;
-      
-    }
-  };
+    itkGetMacro( DirichletMeanId, int);
+    itkSetMacro( DirichletMeanId, int);
+
+    itkGetMacro( SolutionDomainId, int);
+    itkSetMacro( SolutionDomainId, int);
+
+    itkGetMacro( BoundaryConditionToDetermineId, int);
+    itkSetMacro( BoundaryConditionToDetermineId, int);
+
+    itkGetMacro( NumberOfIterations, int);
+    itkSetMacro( NumberOfIterations, int);
+
+    itkGetMacro( KernelWidth, double );
+    itkSetMacro( KernelWidth, double );
+
+
+    struct globalIndxLtFcn {
+        bool operator()( const IndexType& o1,  const IndexType& o2 ) const {
+
+            for ( int iI=0; iI<ImageDimension; iI++ ) {
+                if ( o1[iI]<o2[iI] ) return 1;
+                if ( o1[iI]>o2[iI] ) return 0;
+            }
+            return 0;
+
+        }
+    };
 
 protected:
-  PropagateBCFilter();
-  virtual ~PropagateBCFilter() {};
-  void PrintSelf(std::ostream& os, Indent indent) const;
-  
-  /** Generate Data */
-  void GenerateData( void );
-  void GenerateOutputInformation();
-  double kernelValue( double dR );
+    PropagateBCFilter();
+    virtual ~PropagateBCFilter() {};
+    void PrintSelf(std::ostream& os, Indent indent) const;
+
+    /** Generate Data */
+    void GenerateData( void );
+    void GenerateOutputInformation();
+    double kernelValue( double dR );
 
 
 private:
-  PropagateBCFilter(const Self&); //purposely not implemented
-  void operator=(const Self&); //purposely not implemented
-  
-  int m_DirichletLowId;
-  int m_DirichletMeanId;
-  int m_DirichletHighId;
-  int m_NeumannId;
-  int m_SolutionDomainId;
-  int m_BoundaryConditionToDetermineId;
-  double m_KernelWidth;
+    PropagateBCFilter(const Self&); //purposely not implemented
+    void operator=(const Self&); //purposely not implemented
 
-  int m_NumberOfIterations;
+    int m_DirichletLowId;
+    int m_DirichletMeanId;
+    int m_DirichletHighId;
+    int m_NeumannId;
+    int m_SolutionDomainId;
+    int m_BoundaryConditionToDetermineId;
+    double m_KernelWidth;
+
+    int m_NumberOfIterations;
 
 };
 
