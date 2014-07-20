@@ -508,6 +508,7 @@ def regenerate_segmentations(data, config, outputdir):
     for idx, (id,labelMap,group) in enumerate(data):
         labelOutput = "{workdir}/{id}.zerocortex.nrrd".format(**locals())
         surfaceInput = "{workdir}/{id}.subj.SPHARM.vtk".format(**locals())
+        surfaceInput = "{workdir}/{id}.surf.vtk".format(**locals())
         surfaceLabels = "{workdir}/{id}.labels.vtp".format(**locals())
 
         if system.is_file_newer(labelOutput, labelMap, opts.overwrite):

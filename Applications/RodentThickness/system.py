@@ -232,9 +232,9 @@ def configure_paths(dirs, programs_list, verbose=True, quit_on_error=True):
 def is_file_exist(thefile, override=False):
     if override:
         return False
-    if not os.path.exists(depfile):
+    if not os.path.exists(thefile):
         return False
-    if os.stat(depfile).st_size == 0:
+    if os.stat(thefile).st_size == 0:
         return False
     return True
 
