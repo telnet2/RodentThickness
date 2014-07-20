@@ -1,10 +1,19 @@
 
-# Make sure this file is included only once
+# Make sure this file is included only once by creating globally unique varibles
+# based on the name of this included file.
 get_filename_component(CMAKE_CURRENT_LIST_FILENAME ${CMAKE_CURRENT_LIST_FILE} NAME_WE)
 if(${CMAKE_CURRENT_LIST_FILENAME}_FILE_INCLUDED)
   return()
 endif()
 set(${CMAKE_CURRENT_LIST_FILENAME}_FILE_INCLUDED 1)
+
+## External_${extProjName}.cmake files can be recurisvely included,
+## and cmake variables are global, so when including sub projects it
+## is important make the extProjName and proj variables
+## appear to stay constant in one of these files.
+## Store global variables before overwriting (then restore at end of this file.)
+ProjectDependancyPush(CACHED_extProjName ${extProjName})
+ProjectDependancyPush(CACHED_proj ${proj})
 
 # Include dependent projects if any
 set(extProjName SlicerExecutionModel) #The find_package known name
@@ -53,6 +62,7 @@ if(NOT DEFINED ${extProjName}_DIR AND NOT ${USE_SYSTEM_${extProjName}})
   ### --- End Project specific additions
   set(${proj}_REPOSITORY "${git_protocol}://github.com/Slicer/SlicerExecutionModel.git")
   set(${proj}_GIT_TAG "865e2a771a47c2a3daa3bd8b9a6fc6bac7537255")
+
   ExternalProject_Add(${proj}
     GIT_REPOSITORY ${${proj}_REPOSITORY}
     GIT_TAG ${${proj}_GIT_TAG}
@@ -83,6 +93,6 @@ else()
   SlicerMacroEmptyExternalProject(${proj} "${${proj}_DEPENDENCIES}")
 endif()
 
-list(APPEND ${CMAKE_PROJECT_NAME}_SUPERBUILD_EP_VARS ${extProjName}_DIR:PATH)
-
+ProjectDependancyPop(CACHED_extProjName extProjName)
+ProjectDependancyPop(CACHED_proj proj)
 
