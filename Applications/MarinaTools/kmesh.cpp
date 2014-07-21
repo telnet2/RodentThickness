@@ -187,7 +187,24 @@ static void spharm_basis(int degree, double *p, double *Y) {
 }
 
 
-void runWritePoints(Options& opts, StringVector& args) {
+std::vector<std::string> &split(const std::string &s, char delim, std::vector<std::string> &elems) {
+    std::stringstream ss(s);
+    std::string item;
+    while (std::getline(ss, item, delim)) {
+        elems.push_back(item);
+    }
+    return elems;
+}
+
+
+std::vector<std::string> split(const std::string &s, char delim) {
+    std::vector<std::string> elems;
+    split(s, delim, elems);
+    return elems;
+}
+
+
+void runExportPoints(Options& opts, StringVector& args) {
     string inputFile = args[0];
     vtkIO vio;
     vtkPolyData* input = vio.readFile(inputFile);
@@ -199,16 +216,99 @@ void runWritePoints(Options& opts, StringVector& args) {
         return;
     }
     
-    ofstream fout(outputText.c_str());
+    ofstream fout(outputText);
     for (unsigned int j = 0; j < nPoints; j++) {
         double* p = input->GetPoint(j);
         for (int k = 0; k < 3; k++) {
             float nearest = floorf(p[k] * 1e8 + 0.5) / 1e8;
             fout << nearest << " ";
         }
+        fout << endl;
     }
     fout.close();
 }
+
+
+void runImportPoints(Options& opts, StringVector& args) {
+    string inputFile = args[0];
+    string txtFile = args[1];
+    string outputFile = opts.GetString("-o");
+
+    if (outputFile == "") {
+        cout << "output file is not set. check -o option." << endl;
+        return;
+    }
+    
+    cout << "reading mesh file: " << inputFile << endl;
+    vtkIO vio;
+    vtkPolyData* input = vio.readFile(inputFile);
+    const unsigned int nPoints = input->GetNumberOfPoints();
+
+    cout << "reading text file: " << txtFile << endl;
+    ifstream infile(txtFile.c_str());
+    std::string line;
+    std::vector<double> txtPoints;
+    while (std::getline(infile, line))
+    {
+        std::istringstream iss(line);
+        float a, b, c;
+        if (!(iss >> a >> b >> c)) {
+            cout << "Error while reading points!" << endl;
+            break;
+        } // error
+        
+        // process pair (a,b)
+        txtPoints.push_back(a);
+        txtPoints.push_back(b);
+        txtPoints.push_back(c);
+    }
+    
+    if (txtPoints.size() != nPoints * 3) {
+        cout << "Insufficient number of points: ("
+            << nPoints << " required, but " << txtPoints.size() << " found)" << endl;
+        infile.close();
+        return;
+    }
+    
+    for (unsigned int j = 0; j < nPoints; j++) {
+        double p[3];
+        for (unsigned int k = 0; k < 3; k++) {
+            p[k] = txtPoints[j*3+k];
+        }
+        input->GetPoints()->SetPoint(j, p);
+    }
+    
+
+    vio.writeFile(outputFile, input);
+}
+
+
+
+void runTranslatePoints(Options& opts, StringVector& args) {
+    string inputFile = args[0];
+    string translate = opts.GetString("-translatePoints");
+    cout << "translate by " << translate << endl;
+    std::vector<string> strdata = split(translate, ',');
+    std::vector<double> pntdata;
+    for (unsigned int j = 0; j < strdata.size(); j++) {
+        pntdata.push_back(atof(strdata[j].c_str()));
+    }
+
+    vtkIO vio;
+    vtkPolyData* input = vio.readFile(inputFile);
+    const unsigned int nPoints = input->GetNumberOfPoints();
+
+    for (unsigned int j = 0; j < nPoints; j++) {
+        double* p = input->GetPoint(j);
+        for (unsigned int k = 0; k < pntdata.size(); k++) {
+            p[k] += pntdata[k];
+        }
+        input->GetPoints()->SetPoint(j, p);
+    }
+    
+    vio.writeFile(args[1], input);
+}
+
 
 
 void runSPHARMCoeff(Options& opts, StringVector& args) {
@@ -1664,6 +1764,60 @@ int runScanConversion(pi::Options& opts, pi::StringVector& args) {
 
 
 
+int runIndexToPoint(Options& opts, StringVector& args) {
+    string inputIdx = opts.GetString("-indexToPoint");
+    
+    cout << "Input Index: " << inputIdx << endl;
+    StringVector values = split(inputIdx, ',');
+    ImageType::IndexType idx;
+    for (int j = 0; j < values.size(); j++) {
+        idx[j] = atoi(values[j].c_str());
+    }
+
+
+    ImageType::PointType point;
+    ImageIO<ImageType> imgIO;
+    ImageType::Pointer img = imgIO.ReadCastedImage(args[0]);
+    img->TransformIndexToPhysicalPoint(idx, point);
+    
+    cout << point << endl;
+    return EXIT_SUCCESS;
+}
+
+
+int runPointToIndex(Options& opts, StringVector& args) {
+    string inputPoint = opts.GetString("-pointToIndex");
+    cout << "Input Point: " << inputPoint << endl;
+    StringVector values = split(inputPoint, ',');
+    ImageType::PointType point;
+
+    for (int j = 0; j < values.size(); j++) {
+        point[j] = atof(values[j].c_str());
+    }
+    
+    
+    itk::ContinuousIndex<float,3> idx;
+    ImageIO<ImageType> imgIO;
+    ImageType::Pointer img = imgIO.ReadCastedImage(args[0]);
+    img->TransformPhysicalPointToContinuousIndex(point, idx);
+    cout << idx << endl;
+    return EXIT_SUCCESS;
+
+}
+
+
+int runImageInfo(Options& opts, StringVector& args) {
+    ImageInfo lastImageInfo;
+    ImageIO<ImageType> imgIo;
+    imgIo.ReadCastedImage(args[0], lastImageInfo);
+    printf("Filename: %s\n", args[0].c_str());
+    printf("Dims: %d %d %d\n", lastImageInfo.dimensions[0], lastImageInfo.dimensions[1], lastImageInfo.dimensions[2]);
+    printf("Pixdims: %.2f %.2f %.2f\n", lastImageInfo.spacing[0], lastImageInfo.spacing[1], lastImageInfo.spacing[2]);
+    printf("Origins: %.2f %.2f %.2f\n", lastImageInfo.origin[0], lastImageInfo.origin[1], lastImageInfo.origin[2]);
+    return EXIT_SUCCESS;
+}
+
+
 /// @brief Run PCA analysis
 void runPCA(Options& opts, StringVector& args) {
     vtkIO vio;
@@ -2395,6 +2549,13 @@ void runDetectRidge(Options& opts, StringVector& args) {
 }
 
 
+
+/// @brief run TPS warping
+void runTPSWarp(Options& opts, StringVector& args) {
+    
+}
+
+
 /// @brief run a test code
 void runTest(Options& opts, StringVector& args) {
     vtkIO io;
@@ -2430,7 +2591,9 @@ int main(int argc, char * argv[])
     opts.addOption("-test", "Run test code", SO_NONE);
 
     // points handling
-    opts.addOption("-writePoints", "Save points into a text file", "-writePoints [in-mesh] -o [out-txt]", SO_NONE);
+    opts.addOption("-exportPoints", "Save points into a text file", "-exportPoints [in-mesh] -o [out-txt]", SO_NONE);
+    opts.addOption("-importPoints", "Read points in a text file into a vtk file", "-importPoints [in-mesh] [txt] -o [out-vtk]", SO_NONE);
+    opts.addOption("-translatePoints", "Translate points by adding given tuples", "-translatePoints=x,y,z [in-vtk] [out-vtk]", SO_REQ_SEP);
     
     // scalar array handling
     opts.addOption("-exportScalars", "Export scalar values to a text file", "-exportScalars [in-mesh] [scalar.txt]", SO_NONE);
@@ -2450,6 +2613,9 @@ int main(int argc, char * argv[])
     opts.addOption("-sampleImage", "Sample pixels for each point of a given model. Currently, only supported image type is a scalar", "-sampleImage image.nrrd model.vtp output.vtp -outputScalarName scalarName", SO_NONE);
     opts.addOption("-voronoiImage", "Compute the voronoi image from a given data set. A reference image should be given.", "-voronoiImage ref-image.nrrd input-dataset output-image.nrrd -scalarName voxelLabel", SO_NONE);
     opts.addOption("-scanConversion", "Compute a binary image from a surface model", "-scanConversion input-surface input-image.nrrd output-image.nrrd", SO_NONE);
+    opts.addOption("-indexToPoint", "Transform an index to a physical point with a given image", "-indexToPoint=i,j,k [image-file]", SO_REQ_SEP);
+    opts.addOption("-pointToIndex", "Transform a physical point to an index", "-pointToIndex=x,y,z [image-file]", SO_REQ_SEP);
+    opts.addOption("-imageInfo", "Print out basic image inforation like ImageStat", "-imageInfo [image1] [image2] ...", SO_NONE);
 
 
     // mesh processing
@@ -2468,6 +2634,10 @@ int main(int argc, char * argv[])
     opts.addOption("-traceClipping", "Clip stream lines to fit with an object", "-traceClipping stream_lines.vtp stream_object.vtp stream_lines_output.vtp", SO_NONE);
     opts.addOption("-traceScalarCombine", "Combine scalar values from a seed object to a stream line object. The stream line object must have PointIds for association. -zrotate option will produce the rotated output.", "-traceScalarCombine stream_seed.vtp stream_lines.vtp stream_lines_output.vtp -scalarName scalarToBeCopied", SO_NONE);
     opts.addOption("-rescaleStream", "Rescale streamlines to fit with given lengths", "-rescaleStream input-stream-lines length.txt or input.vtp -scalarName scalarname", SO_NONE);
+    
+    
+    /// TPS warping
+    opts.addOption("-tpsWarp", "Run TPS warping", "-tpsWarp [source-landmark] [target-landmark] [input0] [output0] [input1] [output1] ...", SO_NONE);
 
 
     /// Compute SPHARM smoothing
@@ -2488,8 +2658,12 @@ int main(int argc, char * argv[])
         cout << "## *kmesh* Usage" << endl;
         opts.PrintUsage();
         return 0;
-    } else if (opts.GetBool("-writePoints")) {
-        runWritePoints(opts, args);
+    } else if (opts.GetBool("-importPoints")) {
+        runImportPoints(opts, args);
+    } else if (opts.GetBool("-exportPoints")) {
+        runExportPoints(opts, args);
+    } else if (opts.GetString("-translatePoints") != "") {
+        runTranslatePoints(opts, args);
     } else if (opts.GetBool("-smoothScalars")) {
         runScalarSmoothing(opts, args);
     } else if (opts.GetBool("-importScalars")) {
@@ -2518,6 +2692,12 @@ int main(int argc, char * argv[])
         runVoronoiImage(opts, args);
     } else if (opts.GetBool("-scanConversion")) {
         runScanConversion(opts, args);
+    } else if (opts.GetString("-indexToPoint") != "") {
+        return runIndexToPoint(opts, args);
+    } else if (opts.GetString("-pointToIndex") != "") {
+        return runPointToIndex(opts, args);
+    } else if (opts.GetBool("-imageInfo")) {
+        return runImageInfo(opts, args);
     } else if (opts.GetBool("-vti")) {
         runConvertITK2VTI(opts, args);
     } else if (opts.GetBool("-vtu")) {
@@ -2546,6 +2726,8 @@ int main(int argc, char * argv[])
         runSPHARMCoeff(opts, args);
     } else if (opts.GetBool("-detectRidge")) {
         runDetectRidge(opts, args);
+    } else if (opts.GetBool("-tpsWarp")) {
+        runTPSWarp(opts, args);
     } else if (opts.GetBool("-test")) {
         runTest(opts, args);
     }
