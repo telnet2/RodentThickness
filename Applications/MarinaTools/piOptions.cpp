@@ -88,7 +88,7 @@ namespace pi {
 
     bool Options::GetStringVectorValueTo(std::string name, int n, std::string& out) {
         StringVector& vector = _stringVectorMap[name];
-        if ((int) vector.size() > n) {
+        if (vector.size() > n) {
             out = vector[n];
             return true;
         }
@@ -97,7 +97,7 @@ namespace pi {
 
     bool Options::GetIntVectorValueTo(std::string name, int n, int& out) {
         IntVector& vector = _intVectorMap[name];
-        if ((int) vector.size() > n) {
+        if (vector.size() > n) {
             out = vector[n];
             return true;
         }
@@ -106,7 +106,7 @@ namespace pi {
 
     bool Options::GetRealVectorValueTo(std::string name, int n, OptionReal& out) {
         RealVector& vector = _realVectorMap[name];
-        if ((int) vector.size() > n) {
+        if (vector.size() > n) {
             out = vector[n];
             return true;
         }
@@ -168,7 +168,7 @@ namespace pi {
 
     std::string Options::GetStringVectorValue(std::string name, int n, std::string def) {
         StringVector& vector = _stringVectorMap[name];
-        if ((int) vector.size() > n) {
+        if (vector.size() > n) {
             return vector[n];
         }
         return def;
@@ -180,7 +180,7 @@ namespace pi {
 
     OptionReal Options::GetRealVectorValue(std::string name, int nth, OptionReal def) {
         RealVector& vector = _realVectorMap[name];
-        if ((int) vector.size() > nth) {
+        if (vector.size() > nth) {
             return vector[nth];
         }
         return def;
@@ -192,7 +192,7 @@ namespace pi {
 
     int Options::GetIntVectorValue(std::string name, int nth, int def) {
         IntVector& vector = _intVectorMap[name];
-        if ((int) vector.size() > nth) {
+        if (vector.size() > nth) {
             return vector[nth];
         }
         return def;
@@ -222,7 +222,7 @@ namespace pi {
 				_specs.push_back(endOption);
 			}
 			optionSpecs = &_specs[0];
-            for (unsigned int i = 0; i < _specs.size(); i++) {
+            for (int i = 0; i < _specs.size(); i++) {
                 optionSpecs[i].pszArg = _specNames[i].c_str();
             }
         }
@@ -277,7 +277,7 @@ namespace pi {
         for(Options::IntVectorMap::const_iterator iter = opt._intVectorMap.begin(); iter != opt._intVectorMap.end(); ++iter) {
             IntVector vector = iter->second;
             os << iter->first << " ints";
-            for (unsigned int i = 0; i < vector.size(); i++) {
+            for (int i = 0; i < vector.size(); i++) {
                 os << " " << vector[i];
             }
             os << endl;
@@ -286,7 +286,7 @@ namespace pi {
         for(Options::RealVectorMap::const_iterator iter = opt._realVectorMap.begin(); iter != opt._realVectorMap.end(); ++iter) {
             RealVector vector = iter->second;
             os << iter->first << " reals";
-            for (unsigned int i = 0; i < vector.size(); i++) {
+            for (int i = 0; i < vector.size(); i++) {
                 os << " " << vector[i];
             }
             os << endl;
@@ -295,7 +295,7 @@ namespace pi {
         for(Options::StringVectorMap::const_iterator iter = opt._stringVectorMap.begin(); iter != opt._stringVectorMap.end(); ++iter) {
             StringVector vector = iter->second;
             os << iter->first << " strings " << vector.size() << endl;
-            for (unsigned int i = 0; i < vector.size(); i++) {
+            for (int i = 0; i < vector.size(); i++) {
                 os << vector[i] << endl;
             }
         }
@@ -382,10 +382,31 @@ namespace pi {
         return Split(val, tok);
     }
 
+    
+    IntVector Options::GetSplitIntVector(std::string name, std::string tok) {
+        StringVector data = GetSplitString(name, tok);
+        IntVector intVector;
+        for (int i = 0; i < data.size(); i++) {
+            intVector.push_back(atoi(data[i].c_str()));
+        }
+        return intVector;
+    }
+
+
+    DoubleVector Options::GetSplitDoubleVector(std::string name, std::string tok) {
+        StringVector data = GetSplitString(name, tok);
+        DoubleVector doubleVector;
+        for (int i = 0; i < data.size(); i++) {
+            doubleVector.push_back(atof(data[i].c_str()));
+        }
+        return doubleVector;
+    }
+
+    
     IntVector Options::GetStringAsIntVector(std::string name) {
         StringVector data = GetSplitString(name, ",");
         IntVector intVector;
-        for (unsigned int i = 0; i < data.size(); i++) {
+        for (int i = 0; i < data.size(); i++) {
             intVector.push_back(atoi(data[i].c_str()));
         }
         return intVector;
@@ -461,7 +482,7 @@ namespace pi {
     // print usage
     void Options::PrintUsage() {
         StringVector& specs = GetOptionNames();
-        for (unsigned int i = 0; i < specs.size(); i++) {
+        for (int i = 0; i < specs.size(); i++) {
             string name = specs[i];
             string help = GetOptionHelp(name);
             string usage = GetOptionUsage(name);
@@ -476,6 +497,8 @@ namespace pi {
         }
     }
 
+    void Options::main(Options& opts, StringVector& args) {
+    }
 
     //////////////////////////////////////////////////////////////////////////////////////
     //
@@ -491,5 +514,27 @@ namespace pi {
         }
         return data;
     }
+    
+    
+    IntVector Options::SplitAsInt(std::string str, char tok) {
+        IntVector data;
+        istringstream is(str);
+        string part;
+        while (getline(is, part, tok)) {
+            data.push_back(atoi(part.c_str()));
+        }
+        return data;
+    }
+
+    DoubleVector Options::SplitAsDouble(std::string str, char tok) {
+        DoubleVector data;
+        istringstream is(str);
+        string part;
+        while (getline(is, part, tok)) {
+            data.push_back(atof(part.c_str()));
+        }
+        return data;
+    }
+    
 }
 

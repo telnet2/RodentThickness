@@ -85,6 +85,9 @@ namespace pi {
         StringVector& GetStringVector(std::string name);
         std::string GetStringVectorValue(std::string name, int i, std::string def = "");
         StringVector GetSplitString(std::string name, std::string tok, std::string def = "");
+        IntVector GetSplitIntVector(std::string name, std::string tok);
+        DoubleVector GetSplitDoubleVector(std::string name, std::string tok);
+        
         IntVector GetStringAsIntVector(std::string name);        
         
         RealVector& GetRealVector(std::string name);
@@ -98,6 +101,9 @@ namespace pi {
 
         StringVector& ParseOptions(int argc, char* argv[], CSimpleOpt::SOption*);
         static StringVector Split(std::string str, std::string tok);
+        static IntVector SplitAsInt(std::string str, char tok);
+        static DoubleVector SplitAsDouble(std::string str, char tok);
+        
 
 		void addOption(std::string name, int argType);
 		void addOption(std::string name, std::string help, int argType);
@@ -124,7 +130,7 @@ namespace pi {
 
 
         /// main function for test
-        /// void main(Options& opts, StringVector& args);
+        void main(Options& opts, StringVector& args);
 
     private:
         StringVector _specNames;

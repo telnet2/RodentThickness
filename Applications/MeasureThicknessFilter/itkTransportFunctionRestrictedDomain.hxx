@@ -76,11 +76,28 @@ TransportFunctionRestrictedDomain<TImage, TCovariantVectorImage, TLabelImage>
 
     // Global data structure
     GlobalDataStruct *gd = (GlobalDataStruct *)globalData;
+    if (gd == NULL) {
+        cout << "GlobalDataStruct gd is NULL " << __FILE__ << "," << __LINE__ << endl;
+        exit(0);
+    }
+
+    if (m_LabelImage == NULL) {
+        cout << "LabelImage is NULL " << __FILE__ << ", " << __LINE__ << endl;
+        exit(0);
+    }
+
+
+    if (m_FlowField == NULL) {
+        cout << "FlowField is NULL " << __FILE__ << ", " << __LINE__ << endl;
+        exit(0);
+    }
 
     // get the current vector at the center position
     // so that we can do proper upwinding
 
     IndexType centerIndex = it.GetIndex();
+    //printf("centerIndex: [%d, %d, %d]\n", centerIndex[0], centerIndex[1], centerIndex[2]);
+
     VectorPixelType currentVector = m_FlowField->GetPixel( centerIndex );
 
     LabelPixelType currentLabel = m_LabelImage->GetPixel( centerIndex );
@@ -168,6 +185,7 @@ TransportFunctionRestrictedDomain<TImage, TCovariantVectorImage, TLabelImage>
     //     -v \nabla u + integrationConstant
     // with upwinding derivatives
 
+    //printf("Quit centerIndex: [%d, %d, %d]\n", centerIndex[0], centerIndex[1], centerIndex[2]);
     if ( bDoNotUpdate ) {
         return static_cast<PixelType>( 0 );
     } else {

@@ -51,13 +51,14 @@
 #include <vtkConnectivityFilter.h>
 #include <vtkPolyDataNormals.h>
 #include <vtkTransform.h>
-
+#include <vtkBoundingBox.h>
 
 #include <itkImage.h>
 #include <itkVectorNearestNeighborInterpolateImageFunction.h>
 #include <itkEllipseSpatialObject.h>
 #include <itkSpatialObjectToImageFilter.h>
 #include <itkNearestNeighborInterpolateImageFunction.h>
+#include <itkLabelStatisticsImageFilter.h>
 
 #include <vnl/vnl_matrix.h>
 #include <vnl/vnl_sparse_matrix.h>
@@ -69,15 +70,15 @@
 #include "piImageIO.h"
 #include "kimage.h"
 #include "kstreamtracer.h"
-
-
-
+#include "csv_parser.h"
 
 #include <vnl/vnl_vector.h>
-
+#define UNUSED(x) (void)(x)
 
 using namespace std;
 using namespace pi;
+
+bool _verbose = false;
 
 /// @brief Convert a cartesian coordinate point to a spherical coordinate point
 /// @param v a input point in the cartesian coordinate
@@ -160,7 +161,7 @@ static void spharm_basis(int degree, double *p, double *Y) {
     const float sqr2 = sqrt(2.0f);
 
     const int yCount = (degree - 1) * (degree - 1);
-
+    UNUSED(yCount);
     for (int l = 0; l <= degree; l++)
     {
         // legendre part
@@ -216,7 +217,7 @@ void runExportPoints(Options& opts, StringVector& args) {
         return;
     }
     
-    ofstream fout(outputText);
+    ofstream fout(outputText.c_str());
     for (unsigned int j = 0; j < nPoints; j++) {
         double* p = input->GetPoint(j);
         for (int k = 0; k < 3; k++) {
@@ -310,6 +311,32 @@ void runTranslatePoints(Options& opts, StringVector& args) {
 }
 
 
+void runMeshInfo(Options& opts, StringVector& args) {
+    vtkIO vio;
+    
+    for (int j = 0; j < args.size(); j++) {
+        vtkPolyData* data = vio.readFile(args[j]);
+        printf("File: %s\n", args[j].c_str());
+        printf("# of points = %lld\n", data->GetNumberOfPoints());
+        printf("# of cells = %lld\n", data->GetNumberOfCells());
+        
+        double *bounds = data->GetBounds();
+
+        printf("bbox (x0,y0,z0) - (x1,y1,z1) = (%.4lf,%.4lf,%.4lf) - (%.4lf,%.4lf,%.4lf)\n",
+               bounds[0], bounds[2], bounds[4], bounds[1], bounds[3], bounds[5]);
+
+        bounds = data->GetBounds();
+        printf("x length = %.4lf\n", (bounds[1] - bounds[0]));
+        printf("y length = %.4lf\n", (bounds[3] - bounds[2]));
+        printf("z length = %.4lf\n", (bounds[5] - bounds[4]));
+        printf("center = (%.4lf, %.4lf, %.4lf)\n",
+               (bounds[1]+bounds[0])/2.0,
+               (bounds[3]+bounds[2])/2.0,
+               (bounds[5]+bounds[4])/2.0);
+    }
+}
+
+
 
 void runSPHARMCoeff(Options& opts, StringVector& args) {
     string inputFile = args[0];
@@ -330,7 +357,7 @@ void runSPHARMCoeff(Options& opts, StringVector& args) {
     /// Prepare values
     vnl_vector<double> values;
     values.set_size(scalars->GetNumberOfTuples());
-    for (int i = 0; i < nPoints; i++) {
+    for (unsigned int i = 0; i < nPoints; i++) {
         values[i] = scalars->GetTuple1(i);
     }
 
@@ -353,7 +380,7 @@ void runSPHARMCoeff(Options& opts, StringVector& args) {
     newScalars->SetNumberOfComponents(1);
     newScalars->SetNumberOfTuples(nPoints);
 
-    for (int i = 0; i < nPoints; i++) {
+    for (unsigned int i = 0; i < nPoints; i++) {
         newScalars->SetValue(i, interpolated[i]);
     }
     input->GetPointData()->AddArray(newScalars);
@@ -411,6 +438,85 @@ void runImportScalars(Options& opts, StringVector& args) {
     poly->GetPointData()->AddArray(scalar);
 
     io.writeFile(args[2], poly);
+}
+
+
+/// @brief import scalar arrays from a csv file
+int runImportCSV(Options& opts, StringVector& args) {
+    if (args.size() < 2) {
+        cout << "-importCSV option requires input-vtk and output-vtk-file." << endl;
+        return EXIT_FAILURE;
+    }
+    
+    string csvFile = opts.GetString("-importCSV");
+    string inputVTK = args[0];
+    string outputVTK = args[1];
+    
+    
+    vtkIO io;
+    vtkPolyData* input = io.readFile(inputVTK);
+    if (input == NULL) {
+        cout << "Can't read " << inputVTK << endl;
+        return EXIT_FAILURE;
+    }
+    
+    csv_parser csv;
+    csv.init(csvFile.c_str());
+    csv.set_enclosed_char('"', ENCLOSURE_OPTIONAL);
+    csv.set_field_term_char(',');
+    csv.set_line_term_char('\n');
+
+    
+    StringVector headerNames;
+    csv_row row = csv.get_row();
+    unsigned int nColumns = row.size();
+    if (_verbose) {
+        cout << "CSV file # of columns: " << nColumns << endl;
+    }
+    bool useHeaderName = opts.GetBool("-use-header");
+    
+    // create a number of vtkDoubleArrays
+    vtkDoubleArray** arrays = new vtkDoubleArray*[nColumns];
+    for (unsigned int j = 0; j < nColumns; j++) {
+        arrays[j] = vtkDoubleArray::New();
+        if (useHeaderName) {
+            arrays[j]->SetName(row[j].c_str());
+            if (_verbose) {
+                cout << row[j] << " ";
+            }
+        } else {
+            char buf[1024];
+            sprintf(buf, "Col_%02d", j);
+            arrays[j]->SetName(buf);
+            arrays[j]->InsertNextValue(atof(row[j].c_str()));
+        }
+    }
+    
+
+    
+    // add all the rest of values
+    for (int row_count = 0; csv.has_more_rows(); row_count++) {
+        if (_verbose) {
+            cout << endl << "record " << row_count;
+        }
+        row = csv.get_row();
+        for (unsigned int i = 0; i < row.size(); i++) {
+            double data = atof(row[i].c_str());
+            arrays[i]->InsertNextValue(data);
+        }
+    }
+    
+    
+    // add arrays to the input
+    for (unsigned int j = 0; j < nColumns; j++) {
+        input->GetPointData()->AddArray(arrays[j]);
+    }
+    
+    if (_verbose) {
+        cout << endl << "Writing " << outputVTK << endl;
+    }
+    io.writeFile(outputVTK, input);
+    return EXIT_SUCCESS;
 }
 
 
@@ -893,6 +999,8 @@ bool endswith(std::string str, std::string substr) {
 
 /// @brief perform a line clipping to fit within the object
 bool performLineClipping(vtkPolyData* streamLines, vtkModifiedBSPTree* tree, int lineId, vtkCell* lineToClip, vtkPolyData* object, vtkPoints* outputPoints, vtkCellArray* outputLines, double &length) {
+    UNUSED(lineId);
+    UNUSED(object);
     /// - Iterate over all points in a line
     vtkIdList* ids = lineToClip->GetPointIds();
     /// - Identify a line segment included in the line
@@ -952,6 +1060,8 @@ bool performLineClipping(vtkPolyData* streamLines, vtkModifiedBSPTree* tree, int
 
 /// @brief Perform a line clipping task
 void runTraceClipping(Options& opts, StringVector& args) {
+    UNUSED(opts);
+    
     string inputStreamsFile = args[0];
     string inputObjectFile = args[1];
     string outputStreamsFile = args[2];
@@ -987,7 +1097,7 @@ void runStreamTracer(Options& opts, StringVector& args) {
     bool zRotate = opts.GetBool("-zrotate", false);
 
 
-    vtkDataSet* inputData;
+    vtkDataSet* inputData = NULL;
 
     // FIXME - create a dataset reader
     if (endswith(inputVTUFile, string(".vtu"))) {
@@ -1235,24 +1345,29 @@ void runFilterStream(Options& opts, StringVector& args) {
 
 /// @brief Rescale the streamline with a given length
 void runRescaleStream(Options& opts, StringVector& args) {
-    string inputStreamFile = args[0];
-    string inputDataFile = args[1];
-    string scalarName = opts.GetString("-scalarName");
-
-    vtkIO vio;
-    vtkPolyData* inputStream = vio.readFile(inputStreamFile);
-    vtkPolyData* inputData = vio.readFile(inputDataFile);
-    vtkDataArray* inputScalars = inputData->GetPointData()->GetScalars(scalarName.c_str());
-
-    for (int i = 0; i < inputStream->GetNumberOfLines(); i++) {
-        double length = inputScalars->GetTuple1(i);
-        vtkPolyLine* line = vtkPolyLine::SafeDownCast(inputStream->GetCell(i));
-        if (line == NULL) {
-            vtkLine* aline = vtkLine::SafeDownCast(inputStream->GetCell(i));
-        } else {
-            // reduce length
-        }
-    }
+//    string inputStreamFile = args[0];
+//    string inputDataFile = args[1];
+//    string scalarName = opts.GetString("-scalarName");
+//
+//    vtkIO vio;
+//    vtkPolyData* inputStream = vio.readFile(inputStreamFile);
+//    vtkPolyData* inputData = vio.readFile(inputDataFile);
+//    vtkDataArray* inputScalars = inputData->GetPointData()->GetScalars(scalarName.c_str());
+//
+//    for (int i = 0; i < inputStream->GetNumberOfLines(); i++) {
+//        double length = inputScalars->GetTuple1(i);
+//        UNUSED(length);
+//        vtkPolyLine* line = vtkPolyLine::SafeDownCast(inputStream->GetCell(i));
+//        if (line == NULL) {
+//            vtkLine* aline = vtkLine::SafeDownCast(inputStream->GetCell(i));
+//            UNUSED(aline);
+//        } else {
+//            // reduce length
+//        }
+//    }
+    UNUSED(opts);
+    UNUSED(args);
+    cout << "not implemented yet" << endl;
 }
 
 
@@ -1497,6 +1612,7 @@ void runSampleImage(Options& opts, StringVector& args) {
 
 /// @brief Compute the mean and Gaussian curvature for each point
 void runComputeCurvature(Options& opts, StringVector& args) {
+    UNUSED(opts);
     vtkIO vio;
 
     string inputModelFile = args[0];
@@ -1597,7 +1713,11 @@ void runAverageScalars(Options& opts, StringVector& args) {
 void runVoronoiImage(Options& opts, StringVector& args) {
     string inputImageFile = args[0];
     string inputModelFile = args[1];
-    string outputImageFile = args[2];
+    string outputImageFile = opts.GetString("-o");
+    if (outputImageFile == "") {
+        cout << "The output file should be specified with -o option" << endl;
+        return;
+    }
 
     ImageIO<MaskImageType> io;
     MaskImageType::Pointer maskImage = io.ReadCastedImage(inputImageFile);
@@ -1609,11 +1729,20 @@ void runVoronoiImage(Options& opts, StringVector& args) {
 
     vtkIO vio;
     vtkPolyData* inputModel = vio.readFile(inputModelFile);
+    if (inputModel == NULL) {
+        cout << "Can't read mesh " << inputModelFile << endl;
+        return;
+    }
+    
     vtkKdTreePointLocator* locator = vtkKdTreePointLocator::New();
     locator->SetDataSet(inputModel);
     locator->BuildLocator();
 
     vtkDataArray* scalars = inputModel->GetPointData()->GetScalars(opts.GetString("-scalarName").c_str());
+    if (scalars == NULL) {
+        cout << "Can't read scalars of name: " << opts.GetString("-scalarName") << endl;
+        return;
+    }
 
     const bool zrotate = opts.GetBool("-zrotate");
     for (iter.GoToBegin(); !iter.IsAtEnd(); ++iter) {
@@ -1770,7 +1899,7 @@ int runIndexToPoint(Options& opts, StringVector& args) {
     cout << "Input Index: " << inputIdx << endl;
     StringVector values = split(inputIdx, ',');
     ImageType::IndexType idx;
-    for (int j = 0; j < values.size(); j++) {
+    for (unsigned int j = 0; j < values.size(); j++) {
         idx[j] = atoi(values[j].c_str());
     }
 
@@ -1791,12 +1920,12 @@ int runPointToIndex(Options& opts, StringVector& args) {
     StringVector values = split(inputPoint, ',');
     ImageType::PointType point;
 
-    for (int j = 0; j < values.size(); j++) {
+    for (unsigned int j = 0; j < values.size(); j++) {
         point[j] = atof(values[j].c_str());
     }
     
     
-    itk::ContinuousIndex<float,3> idx;
+    itk::ContinuousIndex<double,3> idx;
     ImageIO<ImageType> imgIO;
     ImageType::Pointer img = imgIO.ReadCastedImage(args[0]);
     img->TransformPhysicalPointToContinuousIndex(point, idx);
@@ -1807,6 +1936,8 @@ int runPointToIndex(Options& opts, StringVector& args) {
 
 
 int runImageInfo(Options& opts, StringVector& args) {
+    UNUSED(opts);
+    UNUSED(args);
     ImageInfo lastImageInfo;
     ImageIO<ImageType> imgIo;
     imgIo.ReadCastedImage(args[0], lastImageInfo);
@@ -1814,6 +1945,44 @@ int runImageInfo(Options& opts, StringVector& args) {
     printf("Dims: %d %d %d\n", lastImageInfo.dimensions[0], lastImageInfo.dimensions[1], lastImageInfo.dimensions[2]);
     printf("Pixdims: %.2f %.2f %.2f\n", lastImageInfo.spacing[0], lastImageInfo.spacing[1], lastImageInfo.spacing[2]);
     printf("Origins: %.2f %.2f %.2f\n", lastImageInfo.origin[0], lastImageInfo.origin[1], lastImageInfo.origin[2]);
+    return EXIT_SUCCESS;
+}
+
+
+int runLabelInfo(Options& opts, StringVector& args) {
+    IntVector labels = opts.GetSplitIntVector("-labelInfo", ",");
+
+    ImageIO<MaskImageType> imgIO;
+    for (int j = 0; j < args.size(); j++) {
+        string inputFile = args[j];
+
+        MaskImageType::Pointer labelImg = imgIO.ReadCastedImage(inputFile);
+        typedef itk::LabelStatisticsImageFilter<MaskImageType, MaskImageType> LabelStatFilter;
+        LabelStatFilter::Pointer statFilter = LabelStatFilter::New();
+        statFilter->SetInput(labelImg);
+        statFilter->SetLabelInput(labelImg);
+        statFilter->Update();
+        
+        for (unsigned int l = 0; l < labels.size(); l++) {
+            LabelStatFilter::BoundingBoxType bbox = statFilter->GetBoundingBox(MaskImageType::PixelType(labels[l]));
+            LabelStatFilter::IndexType idx1, idx2;
+            int dim = (int) idx1.GetIndexDimension();
+            for (int d = 0; d < dim; d++) {
+                idx1[d] = bbox[2*d];
+                idx2[d] = bbox[2*d+1];
+            }
+            MaskImageType::PointType point1, point2;
+            labelImg->TransformIndexToPhysicalPoint(idx1, point1);
+            labelImg->TransformIndexToPhysicalPoint(idx2, point2);
+            
+            printf("Label[%d]: BoundingBox (i0,i1),(j0,j1),(k0,k1) = (%ld,%ld), (%ld,%ld), (%ld,%ld) / (%.3f,%.3f), (%.3f,%.3f), (%.3f,%.3f)\n",
+                   l,
+                   bbox[0], bbox[1], bbox[2], bbox[3], bbox[4], bbox[5],
+                   point1[0], point2[0], point1[1], point2[1], point1[2], point2[2]);
+            printf("Length (x,y,z) = (%ld, %ld, %ld) / (%.3f, %.3f, %.3f)\n", (bbox[1]-bbox[0]), (bbox[3]-bbox[2]), (bbox[5]-bbox[4]), (point2[0]-point1[0]), (point2[1]-point1[1]), (point2[2]-point1[2]));
+            printf("Label[%d]: # of voxels = %ld\n", l, statFilter->GetCount(l));
+        }
+    }
     return EXIT_SUCCESS;
 }
 
@@ -1848,6 +2017,7 @@ void runPCA(Options& opts, StringVector& args) {
 
 /// @brief Perform Procrustes alignment
 void runProcrustes(Options& opts, StringVector& args) {
+    UNUSED(opts);
     int nInputs = args.size() / 2;
 
     vtkIO vio;
@@ -1961,7 +2131,7 @@ void runConnectScalars(Options& opts, StringVector& args) {
     }
 
     /// Update region Ids for every cell
-    for (unsigned int i = 0; i < nCells; i++) {
+    for (int i = 0; i < nCells; i++) {
         int regionId = regionIds->GetTuple1(i);
         regionIds->SetTuple1(i, regionRanking[regionId]);
     }
@@ -2552,12 +2722,15 @@ void runDetectRidge(Options& opts, StringVector& args) {
 
 /// @brief run TPS warping
 void runTPSWarp(Options& opts, StringVector& args) {
-    
+    UNUSED(opts);
+    UNUSED(args);
 }
 
 
 /// @brief run a test code
 void runTest(Options& opts, StringVector& args) {
+    UNUSED(opts);
+    UNUSED(args);
     vtkIO io;
 
     double v1[3] = {0, 0, 5 };
@@ -2594,10 +2767,13 @@ int main(int argc, char * argv[])
     opts.addOption("-exportPoints", "Save points into a text file", "-exportPoints [in-mesh] -o [out-txt]", SO_NONE);
     opts.addOption("-importPoints", "Read points in a text file into a vtk file", "-importPoints [in-mesh] [txt] -o [out-vtk]", SO_NONE);
     opts.addOption("-translatePoints", "Translate points by adding given tuples", "-translatePoints=x,y,z [in-vtk] [out-vtk]", SO_REQ_SEP);
+    opts.addOption("-meshInfo", "Print information about meshes", "-meshInfo [in-vtk1] [in-vtk2] ...", SO_NONE);
     
     // scalar array handling
     opts.addOption("-exportScalars", "Export scalar values to a text file", "-exportScalars [in-mesh] [scalar.txt]", SO_NONE);
+    
     opts.addOption("-importScalars", "Add scalar values to a mesh [in-mesh] [scalar.txt] [out-mesh]", SO_NONE);
+    opts.addOption("-importCSV", "Add scalar values from a csv file into a given mesh", "[-importCSV csv-file] [in-vtk] [out-vtk]", SO_REQ_SEP);
     opts.addOption("-indirectImportScalars", "Import scalar values indirectly via another mapping attribute", "-indirectImportScalars in-vtk in-txt out-vtk -scalarName mapping-attribute -outputScalarName imported-attribute", SO_NONE);
     opts.addOption("-smoothScalars", "Gaussian smoothing of scalar values of a mesh. [in-mesh] [out-mesh]", SO_NONE);
     opts.addOption("-importVectors", "Add vector values to a mesh [in-mesh] [scalar.txt] [out-mesh] [-computeVectorStats]", SO_NONE);
@@ -2605,7 +2781,7 @@ int main(int argc, char * argv[])
     opts.addOption("-computeVectorStats", "Compute mean and std for a vector attribute", "-importVectors ... [-computeVectorStats]", SO_NONE);
 
     opts.addOption("-copyScalars", "Copy a scalar array of the input model to the output model", "-copyScalars input-model1 input-model2 output-model -scalarName name", SO_NONE);
-    opts.addOption("-averageScalars", "Compute the average of scalars across given inputs", "-averageScalars -o output-vtk input1-vtk input2-vtk ... ", SO_NONE);
+    opts.addOption("-averageScalars", "Compute the average of scalars across given inputs and add the average as a new scalar array, and save into with the same name", "-averageScalars input1-vtk input2-vtk ... ", SO_NONE);
     opts.addOption("-connectScalars", "Compute the connected components based on scalars and assign region ids", "-connectScalars input.vtk output.vtk -scalarName scalar -thresholdMin min -thresholdMax max", SO_NONE);
     opts.addOption("-corrClustering", "Compute correlational clusters -corrClustering input-vtk -scalarName values-to-compute-correlation -outputScalarName clusterId", SO_NONE);
 
@@ -2616,7 +2792,7 @@ int main(int argc, char * argv[])
     opts.addOption("-indexToPoint", "Transform an index to a physical point with a given image", "-indexToPoint=i,j,k [image-file]", SO_REQ_SEP);
     opts.addOption("-pointToIndex", "Transform a physical point to an index", "-pointToIndex=x,y,z [image-file]", SO_REQ_SEP);
     opts.addOption("-imageInfo", "Print out basic image inforation like ImageStat", "-imageInfo [image1] [image2] ...", SO_NONE);
-
+    opts.addOption("-labelInfo", "Print out label information bounding box, volumes, etc", "-labelInfo=l1,l2,...,l3 [image-file]", SO_REQ_SEP);
 
     // mesh processing
     opts.addOption("-appendData", "Append input meshes into a single data [output-mesh]", SO_REQ_SEP);
@@ -2650,10 +2826,15 @@ int main(int argc, char * argv[])
     opts.addOption("-fitting", "Fit a model into a binary image", "-fitting input-model binary-image output-model", SO_NONE);
     opts.addOption("-ellipse", "Create an ellipse with parameters []", "-ellipse 101 101 101 51 51 51 20 20 20 -o ellipse.nrrd", SO_NONE);
 
+    opts.addOption("-verbose", "Print verbose information", SO_NONE);
+    opts.addOption("-use-header", "Option to use header values (-importCSV)", SO_NONE);
     opts.addOption("-h", "print help message", SO_NONE);
     StringVector args = opts.ParseOptions(argc, argv, NULL);
 
 
+    // check whether verbose output is used
+    _verbose = opts.GetBool("-verbose");
+    
     if (opts.GetBool("-h")) {
         cout << "## *kmesh* Usage" << endl;
         opts.PrintUsage();
@@ -2664,10 +2845,14 @@ int main(int argc, char * argv[])
         runExportPoints(opts, args);
     } else if (opts.GetString("-translatePoints") != "") {
         runTranslatePoints(opts, args);
+    } else if (opts.GetBool("-meshInfo")) {
+        runMeshInfo(opts, args);
     } else if (opts.GetBool("-smoothScalars")) {
         runScalarSmoothing(opts, args);
     } else if (opts.GetBool("-importScalars")) {
         runImportScalars(opts, args);
+    } else if (opts.GetString("-importCSV") != "") {
+        return runImportCSV(opts, args);
     } else if (opts.GetBool("-indirectImportScalars")) {
         runIndirectImportScalars(opts, args);
     } else if (opts.GetBool("-exportScalars")) {
@@ -2698,6 +2883,8 @@ int main(int argc, char * argv[])
         return runPointToIndex(opts, args);
     } else if (opts.GetBool("-imageInfo")) {
         return runImageInfo(opts, args);
+    } else if (opts.GetString("-labelInfo") != "") {
+        return runLabelInfo(opts, args);
     } else if (opts.GetBool("-vti")) {
         runConvertITK2VTI(opts, args);
     } else if (opts.GetBool("-vtu")) {

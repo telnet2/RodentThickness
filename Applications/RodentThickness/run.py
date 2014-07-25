@@ -123,7 +123,7 @@ def concatColumnsToFile(input, output, inputIsList=False):
 '''
 execute MeshPointsIntensitySampling
 '''
-def sample_attributes(opts,config,csvdata,outputDir,corr_opt):
+def sample_thickness(opts,config,csvdata,outputDir,corr_opt):
     meshDir = "{outputDir}/Processing/1.MeasurementandSPHARM".format(**locals())
     shapeworksDir = "{outputDir}/Processing/2.shapeworks".format(**locals())
     sampleDir = "{outputDir}/Processing/3.sampling".format(**locals())
@@ -172,50 +172,53 @@ def sample_attributes(opts,config,csvdata,outputDir,corr_opt):
         # exeCmd = samplingCmd % (outputDir, distanceVector, samplingTxt, samplingMeshOutput, smoothSamplingTxt, originalMeshOutput, inputMeasurement, inputMesh)
         #system.run_process(exeCmd,verbose=True)
 
-        useStreamLine = corr_opt == "spharm_sampling"
-        if (not useStreamLine):
-            exeCmd = "{pathKmesh} -sampleImage {inputMeasurement} {inputMesh} {samplingMeshOutput} " +\
-                        "-outputScalarName Thickness -zrotate"
-            exeCmd = exeCmd.format(**locals())
-            system.run_process(exeCmd,verbose=True)
+        if system.is_file_newer(smoothSamplingTxt, inputMeasurement, opts.overwrite) or \
+                system.is_file_newer(smoothSamplingTxt, samplingTxt, opts.overwrite) or \
+                system.is_file_newer(smoothSamplingTxt, samplingMeshOutput, opts.overwrite):
+            useStreamLine = corr_opt == "spharm_sampling"
+            if (not useStreamLine):
+                exeCmd = "{pathKmesh} -sampleImage {inputMeasurement} {inputMesh} {samplingMeshOutput} " +\
+                            "-outputScalarName Thickness -zrotate"
+                exeCmd = exeCmd.format(**locals())
+                system.run_process(exeCmd,verbose=True)
 
-            exeCmd = "{pathKmesh} -smoothScalars {samplingMeshOutput} {samplingMeshOutput} " +\
-                        "-scalarName Thickness -outputScalarName smoothThickness -iter 3"
-            exeCmd = exeCmd.format(**locals())
-            system.run_process(exeCmd,verbose=True)
+                exeCmd = "{pathKmesh} -smoothScalars {samplingMeshOutput} {samplingMeshOutput} " +\
+                            "-scalarName Thickness -outputScalarName smoothThickness -iter 3"
+                exeCmd = exeCmd.format(**locals())
+                system.run_process(exeCmd,verbose=True)
 
-            exeCmd = "{pathKmesh} -exportScalars {samplingMeshOutput} {samplingTxt} -scalarName Thickness"
-            exeCmd = exeCmd.format(**locals())
-            system.run_process(exeCmd,verbose=True)
+                exeCmd = "{pathKmesh} -exportScalars {samplingMeshOutput} {samplingTxt} -scalarName Thickness"
+                exeCmd = exeCmd.format(**locals())
+                system.run_process(exeCmd,verbose=True)
 
-            exeCmd = "{pathKmesh} -exportScalars {samplingMeshOutput} {smoothSamplingTxt} " +\
-                        "-scalarName smoothThickness "
-            exeCmd = exeCmd.format(**locals())
-            system.run_process(exeCmd,verbose=True)
-        else:
-            gradientFile = "{outputDir}/Processing/1.MeasurementandSPHARM/" +\
-                    "{id}/laplacianGradient.nrrd".format(**locals())
-            gradientVTIFile = "{outputDir}/Processing/1.MeasurementandSPHARM/" +\
-                    "{id}/laplacianGradient.vti".format(**locals())
-            streamLineFile = "{outputDir}/Processing/1.MeasurementandSPHARM/" +\
-                    "{id}/stream_lines.vtp".format(**locals())
+                exeCmd = "{pathKmesh} -exportScalars {samplingMeshOutput} {smoothSamplingTxt} " +\
+                            "-scalarName smoothThickness "
+                exeCmd = exeCmd.format(**locals())
+                system.run_process(exeCmd,verbose=True)
+            else:
+                gradientFile = "{outputDir}/Processing/1.MeasurementandSPHARM/" +\
+                        "{id}/laplacianGradient.nrrd".format(**locals())
+                gradientVTIFile = "{outputDir}/Processing/1.MeasurementandSPHARM/" +\
+                        "{id}/laplacianGradient.vti".format(**locals())
+                streamLineFile = "{outputDir}/Processing/1.MeasurementandSPHARM/" +\
+                        "{id}/stream_lines.vtp".format(**locals())
 
-            # vti image creation
-            exeCmd = "{pathKmesh} -vti {gradientFile} {gradientVTIFile} -attrDim 3"
-            exeCmd = exeCmd.format(**locals())
-            system.run_process(exeCmd,verbose=True)
+                # vti image creation
+                exeCmd = "{pathKmesh} -vti {gradientFile} {gradientVTIFile} -attrDim 3"
+                exeCmd = exeCmd.format(**locals())
+                system.run_process(exeCmd,verbose=True)
 
-            # RK45 integration
-            exeCmd = "{pathKmesh} -zrotate -traceDirection backward -traceStream " +\
-                "{gradientVTIFile} {inputMesh} {streamLineFile} {samplingMeshOutput}"
-            exeCmd = exeCmd.format(**locals())
-            system.run_process(exeCmd,verbose=True)
+                # RK45 integration
+                exeCmd = "{pathKmesh} -zrotate -traceDirection backward -traceStream " +\
+                    "{gradientVTIFile} {inputMesh} {streamLineFile} {samplingMeshOutput}"
+                exeCmd = exeCmd.format(**locals())
+                system.run_process(exeCmd,verbose=True)
 
-            # scalar export
-            exeCmd = "{pathKmesh} -scalarName Length -exportScalars " +\
-                "{samplingMeshOutput} {smoothSamplingTxt}"
-            exeCmd = exeCmd.format(**locals())
-            system.run_process(exeCmd,verbose=True)
+                # scalar export
+                exeCmd = "{pathKmesh} -scalarName Length -exportScalars " +\
+                    "{samplingMeshOutput} {smoothSamplingTxt}"
+                exeCmd = exeCmd.format(**locals())
+                system.run_process(exeCmd,verbose=True)
 
 
 
@@ -229,7 +232,7 @@ def perform_analysis(opts, config, csvdata, outputDir, corr_opt="initial_dense")
     sampleDir = "{outputDir}/Processing/3.sampling".format(**locals())
     statDir = "{outputDir}/Statistics".format(**locals())
 
-    sample_attributes(opts,config,csvdata,outputDir,corr_opt)
+    sample_thickness(opts,config,csvdata,outputDir,corr_opt)
 
     # collect_attributes()
     # compute_statistics()
@@ -323,7 +326,8 @@ def perform_analysis(opts, config, csvdata, outputDir, corr_opt="initial_dense")
         runCmd = "%s %s %s %s %s" % (rscriptExePath, rscriptPath, datafilelist, outputfile, datagroups)
         system.run_process(runCmd,verbose=True)
         #visCmd = "%s %s %s %s -i %s -t" % (pythonPath, pythonScriptPath, inputVTK, outputVTK, outputfile)
-        #system.run_process(visCmd,verbose=True)
+        visCmd = "%s -use-header %s %s -importCSV %s" % (pathKmesh, inputVTK, outputVTK, outputfile)
+        system.run_process(visCmd,verbose=True)
 
         # connected components for p-value
         print "computing connected components with t.pvalue..."
@@ -344,11 +348,21 @@ def perform_analysis(opts, config, csvdata, outputDir, corr_opt="initial_dense")
                 performSplit([dataregionfilename], "%s/data_%s_region_" % (statDir, group) + "%02d.txt")
 
             # boxplot
-            groupList = list(groupSet)
-            runCmd = "%s %s '%s' '%s' %s/%s_%s_regions.pdf --label1 %s --label2 %s" % (pythonPath, pythonScriptPath.replace("vtkPointAttributes.py", "boxplot.py"), "%s/data_%s_region_*.txt" % (statDir, groupList[0]), "%s/data_%s_region_*.txt" % (statDir, groupList[1]), statDir, groupList[0], groupList[1], groupList[0], groupList[1])
-            print runCmd
-            system.run_process(runCmd,verbose=True)
-
+            draw_boxplot = True
+            if draw_boxplot:
+                groupList = list(groupSet)
+                try:
+                    print sys.path
+                    import boxplot
+                    gr1 = groupList[0]
+                    gr2 = groupList[1]
+                    boxplot.draw_boxplot(groupList[0], groupList[1], \
+                        "{statDir}/data_{gr1}_region_*.txt".format(**locals()), \
+                        "{statDir}/data_{gr2}_region_*.txt".format(**locals()), \
+                        "{statDir}/{gr1}_{gr2}_regions.pdf".format(**locals()))
+                except BaseException as e:
+                    print system.bcolors.WARNING + e.message + system.bcolors.ENDC
+                    pass
 
 
 
@@ -369,9 +383,9 @@ def labelprocessing(config, csvdata, outputdir, labelNCleft, labelNCright, label
 # run thickness measurement
 # if the measurement file exists, skip it
 def compute_thickness(opts, config, data, outputdir, ids, idl, idh):
-    pathTool = config["measureThicknessFilterPath"]
+    pathThicknessTool = config["measureThicknessFilterPath"]
     for (id, labelmap, group) in data:
-        #labelmap = "{outputdir}/Processing/1.MeasurementandSPHARM/{id}.boundaryMap.mha".format(**locals())
+        labelmap = "{outputdir}/Processing/1.MeasurementandSPHARM/{id}.boundaryMap.mha".format(**locals())
         # temporary
         #    workdir = "%s/Processing/1.MeasurementandSPHARM/%s_2" % (outputdir, id)
         #    measurementoutput = "%s/Processing/1.MeasurementandSPHARM/%s.thickness.mha" % (outputdir, id)
@@ -384,9 +398,10 @@ def compute_thickness(opts, config, data, outputdir, ids, idl, idh):
         if (not os.path.exists(workdir)):
             os.makedirs(workdir)
 
-        if system.is_file_newer(measurementoutput, labelmap, opts.overwrite):
-            cmd = "{pathTool} --mr --sbt --ids {ids} --idl {idl} --idh {idh} --ttrns 500 " +\
-                "--workdir {workdir} {labelmap} {measurementoutput}"
+        if system.is_file_newer(measurementoutput, labelmap, opts.overwrite) or \
+                system.is_file_newer(measurementoutput, "{workdir}/laplacianCache.nii.gz".format(**locals()), opts.overwrite):
+            cmd = "{pathThicknessTool} --mr --sbt --ids {ids} --idl {idl} --idh {idh} --ttrns 500 " +\
+                "--workdir {workdir} --cachedLaplacianOutput laplacianCache.nii.gz {labelmap} {measurementoutput}"
             cmd = cmd.format(**locals())
             system.run_process(cmd,verbose=True)
 
@@ -505,64 +520,65 @@ def regenerate_segmentations(data, config, outputdir):
     if testSurfaceInputsFail:
         raise RuntimeError("There are missing surface inputs. Check SPHARM results!")
 
-    for idx, (id,labelMap,group) in enumerate(data):
-        labelOutput = "{workdir}/{id}.zerocortex.nrrd".format(**locals())
-        surfaceInput = "{workdir}/{id}.subj.SPHARM.vtk".format(**locals())
-        surfaceInput = "{workdir}/{id}.surf.vtk".format(**locals())
-        surfaceLabels = "{workdir}/{id}.labels.vtp".format(**locals())
+    if opts.nop1 is False:
+        for idx, (id,labelMap,group) in enumerate(data):
+            labelOutput = "{workdir}/{id}.zerocortex.nrrd".format(**locals())
+            surfaceInput = "{workdir}/{id}.subj.SPHARM.vtk".format(**locals())
+            #surfaceInput = "{workdir}/{id}.surf.vtk".format(**locals())
+            surfaceLabels = "{workdir}/{id}.labels.vtp".format(**locals())
 
-        if system.is_file_newer(labelOutput, labelMap, opts.overwrite):
-            cmd = "{pathKcalc} -e 'A==3?0:A' -o {labelOutput} {labelMap}"
-            cmd = cmd.format(**locals())
-            if system.run_process(cmd,verbose=True) != 0:
-                raise RuntimeError("fail to modify labelmap")
+            if system.is_file_newer(labelOutput, labelMap, opts.overwrite):
+                cmd = "{pathKcalc} -e 'A==3?0:A' -o {labelOutput} {labelMap}"
+                cmd = cmd.format(**locals())
+                if system.run_process(cmd,verbose=True) != 0:
+                    raise RuntimeError("fail to modify labelmap")
 
-        if system.is_file_newer(surfaceLabels, surfaceInput, opts.overwrite) or \
-                system.is_file_newer(surfaceLabels, labelOutput, opts.overwrite):
-            cmd = "{pathKmesh} -sampleImage -zrotate -outputScalarName labels " + \
-                    "{labelOutput} {surfaceInput} {surfaceLabels}"
-            cmd = cmd.format(**locals())
-            if system.run_process(cmd,verbose=True) != 0:
-                raise RuntimError("fail to run kmesh") 
+            if system.is_file_newer(surfaceLabels, surfaceInput, opts.overwrite) or \
+                    system.is_file_newer(surfaceLabels, labelOutput, opts.overwrite):
+                cmd = "{pathKmesh} -sampleImage -zrotate -outputScalarName labels " + \
+                        "{labelOutput} {surfaceInput} {surfaceLabels}"
+                cmd = cmd.format(**locals())
+                if system.run_process(cmd,verbose=True) != 0:
+                    raise RuntimError("fail to run kmesh") 
 
-    if False:
-        vars = locals()
+    # compute the average of labels scalar values to smooth out
+    if opts.nop2 is False:
         cmd = "{pathKmesh} -averageScalars -threshold 1.8 " + \
               "-scalarName labels -outputScalarName meanLabels"
         cmd = cmd.format(**locals())
         for (tag, labelmap, group) in data:
-            surfaceMeshWithLabels = "{workdir}/{tag}.labels.vtp".format(**vars)
+            surfaceMeshWithLabels = "{workdir}/{tag}.labels.vtp".format(**locals())
             cmd += " " + surfaceMeshWithLabels
-        print cmd
         system.run_process(cmd,verbose=True)
 
-    for idx,(tag,labelMap,group) in enumerate(data):
-        labelOutput = "{workdir}/{tag}.zerocortex.nrrd".format(**locals())
-        surfaceLabels = "{workdir}/{tag}.labels.vtp".format(**locals())
-        voronoiImage = "{workdir}/{tag}.voronoi.mha".format(**locals())
-        surfaceImage = "{workdir}/{tag}.solution.mha".format(**locals())
-        boundaryMap = "{workdir}/{tag}.boundaryMap.mha".format(**locals())
+    if opts.nop3 is False:
+        for idx,(tag,labelMap,group) in enumerate(data):
+            labelOutput = "{workdir}/{tag}.zerocortex.nrrd".format(**locals())
+            surfaceLabels = "{workdir}/{tag}.labels.vtp".format(**locals())
+            voronoiImage = "{workdir}/{tag}.voronoi.mha".format(**locals())
+            surfaceImage = "{workdir}/{tag}.solution.mha".format(**locals())
+            boundaryMap = "{workdir}/{tag}.boundaryMap.mha".format(**locals())
 
-        if system.is_file_newer(labelOutput, voronoiImage, opts.overwrite) or \
-                system.is_file_newer(surfaceLabels, voronoiImage, opts.overwrite):
-            cmd = "{pathKmesh} -voronoiImage -zrotate " +\
-                "{labelOutput} {surfaceLabels} {voronoiImage} -scalarName meanLabels"
-            cmd = cmd.format(**locals())
-            system.run_process(cmd,verbose=True)
+            if system.is_file_newer(labelOutput, voronoiImage, opts.overwrite) or \
+                    system.is_file_newer(surfaceLabels, voronoiImage, opts.overwrite):
+                cmd = "{pathKmesh} -voronoiImage -zrotate -scalarName meanLabels " +\
+                    "{labelOutput} {surfaceLabels} -o {voronoiImage}"
+                cmd = cmd.format(**locals())
+                system.run_process(cmd,verbose=True)
 
-        if system.is_file_newer(labelOutput, voronoiImage, opts.overwrite) or \
-                system.is_file_newer(surfaceLabels, voronoiImage, opts.overwrite):
-            cmd = "{pathKmesh} -scanConversion -zrotate " +\
-                "{surfaceLabels} {labelOutput} {surfaceImage}"
-            cmd = cmd.format(**locals())
-            system.run_process(cmd,verbose=True)
+            if system.is_file_newer(labelOutput, voronoiImage, opts.overwrite) or \
+                    system.is_file_newer(surfaceLabels, voronoiImage, opts.overwrite):
+                cmd = "{pathKmesh} -scanConversion -zrotate " +\
+                    "{surfaceLabels} {labelOutput} {surfaceImage}"
+                cmd = cmd.format(**locals())
+                system.run_process(cmd,verbose=True)
 
-        if system.is_file_newer(voronoiImage, boundaryMap, opts.overwrite) or \
-                system.is_file_newer(surfaceImage, boundaryMap, opts.overwrite):
-            cmd = "{pathKcalc} -e 'B>0?3:A' -o {boundaryMap} " +\
-                "{voronoiImage} {surfaceImage}"
-            cmd = cmd.format(**locals())
-            system.run_process(cmd,verbose=True)
+            if system.is_file_newer(voronoiImage, boundaryMap, opts.overwrite) or \
+                    system.is_file_newer(surfaceImage, boundaryMap, opts.overwrite):
+                cmd = "{pathKcalc} -e 'B>0?3:A' -o {boundaryMap} " +\
+                    "{voronoiImage} {surfaceImage}"
+                cmd = cmd.format(**locals())
+                system.run_process(cmd,verbose=True)
 
 
 def setup_particle_tools(config, data, outputDir, ids):
@@ -657,6 +673,7 @@ if (__name__ == "__main__"):
     parser.add_option("--run-particle-tools", help="run particle correspondence", action="store_true", dest="run_particle_tools")
     parser.add_option("--regenerate-segmentations", dest="regenerate_segmentations", help="Regenerate segmentation images based on reconstructed mesh", action="store_true")
     parser.add_option("--compute-thickness", help="compute thickness for a given label", action="store_true", dest="compute_thickness")
+    parser.add_option("--sample-thickness", help="sample thickness from the measurement with a given mesh", action="store_true", dest="sample_thickness")
     parser.add_option("--compute-statistics", help="compute statistics for hypothesis testing", action="store_true", dest="compute_statistics")
     parser.add_option("--run-preprocessing", help="generate surface meshes and regenerate consistent labelmaps", action="store_true", dest="run_preprocessing")
     parser.add_option("--run-all", help="run all pipeline steps", action="store_true", dest="run_all")
@@ -671,10 +688,14 @@ if (__name__ == "__main__"):
 
     parser.add_option("--regionSplit", help="split the data file with its region (1st column)", dest="regionSplit", action="store_true")
     parser.add_option("--outputPattern", help="Specify the output pattern ex) --outputPattern region_control_%02d.txt", dest="outputPattern")
-    parser.add_option("--overwrite", help="specify if the script overwrites previous results", action="store_true", dest="overwrite")
+    parser.add_option("--overwrite", help="specify if the script overwrites previous results", action="store_true", dest="overwrite", default=False)
     parser.add_option("--log-file", help="Specify the filename for logging stdout and stderr outputs", dest="logfileName", default=None)
     parser.add_option("--check-commands", help="Specify if the script logs only command lines not executing those", action="store_true", dest="check_commands")
     parser.add_option("--verbose", help="Print out logs to cosnole", action="store_true", dest="verbose", default=False)
+
+    parser.add_option("--nop1", help="Debug flag to skip a part1 of an algorithm", action="store_true", dest="nop1", default=False)
+    parser.add_option("--nop2", help="Debug flag to skip a part1 of an algorithm", action="store_true", dest="nop2", default=False)
+    parser.add_option("--nop3", help="Debug flag to skip a part1 of an algorithm", action="store_true", dest="nop3", default=False)
 
     (opts, args) = parser.parse_args()
 
@@ -718,6 +739,9 @@ if (__name__ == "__main__"):
         if (opts.run_particle_tools):
             setup_particle_tools(config, csvdata, outputdir, opts.ids)
             run_particle_tools(config, csvdata, outputdir, opts.ids)
+
+        if opts.sample_thickness:
+            sample_thickness(opts, config, csvdata, outputdir, "initial_dense")
 
         if (opts.compute_statistics):
             #perform_analysis(csvdata, config, outputdir, "initial_dense")

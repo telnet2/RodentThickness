@@ -251,6 +251,7 @@ def is_file_newer(thefile, depfile, override=False):
         return False
     if os.stat(depfile).st_size == 0:
         return False
+    #print thefile, os.path.getmtime(thefile), depfile, os.path.getmtime(depfile)
     if os.path.getmtime(depfile) > os.path.getmtime(thefile):
         return True
     return False

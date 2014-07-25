@@ -78,6 +78,8 @@ int main( int argc, const char ** argv ) {
     PARSE_ARGS;
 
     itksys::SystemTools::ChangeDirectory(workingDirectory.c_str());
+    itk::MultiThreader::SetGlobalMaximumNumberOfThreads(1);
+    itk::MultiThreader::SetGlobalDefaultNumberOfThreads(1);
 
     // labelmap as an input
 
