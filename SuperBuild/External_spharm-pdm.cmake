@@ -18,10 +18,8 @@ set(proj ${extProjName}) #This local name
 
 
 ExternalProject_Add(spharm-pdm
-  SVN_REPOSITORY "http://www.nitrc.org/svn/spharm-pdm"
-  SVN_REVISION -r "194"
-  SVN_USERNAME slicerbot
-  SVN_PASSWORD slicer
+  GIT_REPOSITORY "${git_protocol}://github.com/NIRALUser/SPHARM-PDM.git"
+  GIT_TAG "${GIT_TAG}"
   SOURCE_DIR ${proj}
   BINARY_DIR ${proj}-build
   CMAKE_GENERATOR ${gen}
@@ -45,7 +43,6 @@ ExternalProject_Add(spharm-pdm
   -DUSE_SYSTEM_BatchMake:BOOL=ON
   -DUSE_SYSTEM_CLAPACK:BOOL=OFF
   -DUSE_SYSTEM_LAPACK:BOOL=OFF
- # -DBoost_DIR:PATH=${Boost_DIR}
   -DITK_DIR:PATH=${ITK_DIR}
   -DVTK_DIR:PATH=${VTK_DIR}
   -DSlicerExecutionModel_DIR:PATH=${SlicerExecutionModel_DIR}
