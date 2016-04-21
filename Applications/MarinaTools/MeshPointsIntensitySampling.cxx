@@ -428,12 +428,12 @@ void runSmoothScalars(vtkPolyData* poly, string attrOutput, double sigma, int nI
 
     vtkPolyDataWriter* writer1 = vtkPolyDataWriter::New();
     writer1->SetFileName(meshSampling.c_str());
-    writer1->SetInput(vtkMesh);
+    writer1->SetInputData(vtkMesh);
     writer1->Write();
 
     vtkPolyDataWriter* writer2 = vtkPolyDataWriter::New();
     writer2->SetFileName(meshOutput.c_str());
-    writer2->SetInput(sourceMesh);
+    writer2->SetInputData(sourceMesh);
     writer2->Write();
 
     return 0;

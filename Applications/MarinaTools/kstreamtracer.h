@@ -90,7 +90,8 @@ class vtkIdList;
 class vtkIntArray;
 class vtkAbstractInterpolatedVelocityField;
 
-class VTK_GRAPHICS_EXPORT StreamTracer : public vtkPolyDataAlgorithm
+//class VTK_GRAPHICS_EXPORT StreamTracer : public vtkPolyDataAlgorithm
+class StreamTracer : public vtkPolyDataAlgorithm
 {
 public:
   vtkTypeMacro(StreamTracer,vtkPolyDataAlgorithm);

@@ -398,7 +398,7 @@ void runAppendData(Options& opts, StringVector& args) {
     // read all files
     for (unsigned int i = 0; i < args.size(); i++) {
         vtkPolyData* data = io.readFile(args[i]);
-        appender->AddInput(data);
+        appender->AddInputData(data);
     }
 
     appender->Update();
@@ -948,7 +948,7 @@ void runConvertITK2VTI(Options& opts, StringVector& args) {
     w->SetCompressorTypeToZLib();
     w->SetDataModeToBinary();
 
-    w->SetInput(outputData);
+    w->SetInputData(outputData);
     w->Write();
 }
 
@@ -987,7 +987,7 @@ void runConvertITK2VTU(Options& opts, StringVector& args) {
     w->SetCompressorTypeToZLib();
     w->SetDataModeToBinary();
 
-    w->SetInput(outputData);
+    w->SetInputData(outputData);
     w->Write();
 }
 
@@ -1137,7 +1137,7 @@ void runStreamTracer(Options& opts, StringVector& args) {
 
     /// - Set up tracer (Use RK45, both direction, initial step 0.05, maximum propagation 500
     StreamTracer* tracer = StreamTracer::New();
-    tracer->SetInput(inputData);
+    tracer->SetInputData(inputData);
     tracer->SetSource(inputPoints);
 //    double seedPoint[3];
  //   inputPoints->GetPoint(24745, seedPoint);
@@ -1236,7 +1236,7 @@ void runStreamTracer(Options& opts, StringVector& args) {
 
 
         vtkCleanPolyData* cleaner = vtkCleanPolyData::New();
-        cleaner->SetInput(outputStreamLines);
+        cleaner->SetInputData(outputStreamLines);
         cleaner->Update();
         vio.writeFile(outputStreamFile, cleaner->GetOutput());
     } else {
@@ -1424,7 +1424,7 @@ void runFittingModel(Options& opts, StringVector& args) {
         // Compute laplacian smoothing by taking iterative average
 
         vtkSmoothPolyDataFilter* filter = vtkSmoothPolyDataFilter::New();
-        filter->SetInput(inputModel);
+        filter->SetInputData(inputModel);
         filter->SetNumberOfIterations(1);
         filter->Update();
         inputModel = filter->GetOutput();
@@ -1629,28 +1629,28 @@ void runComputeCurvature(Options& opts, StringVector& args) {
 
 
     vtkCurvatures* curv1 = vtkCurvatures::New();
-    curv1->SetInput(inputModel);
+    curv1->SetInputData(inputModel);
     curv1->SetCurvatureTypeToGaussian();
     curv1->Update();
     vtkPolyData* gx = curv1->GetOutput();
     inputModel->GetPointData()->AddArray(gx->GetPointData()->GetScalars("GAUSS_Curvature"));
 
     vtkCurvatures* curv2 = vtkCurvatures::New();
-    curv2->SetInput(inputModel);
+    curv2->SetInputData(inputModel);
     curv2->SetCurvatureTypeToMean();
     curv2->Update();
     vtkPolyData* mx = curv2->GetOutput();
     inputModel->GetPointData()->AddArray(mx->GetPointData()->GetScalars("Mean_Curvature"));
 
     vtkCurvatures* curv3 = vtkCurvatures::New();
-    curv3->SetInput(inputModel);
+    curv3->SetInputData(inputModel);
     curv3->SetCurvatureTypeToMaximum();
     curv3->Update();
     vtkPolyData* mx2 = curv3->GetOutput();
     inputModel->GetPointData()->AddArray(mx2->GetPointData()->GetScalars("Maximum_Curvature"));
 
     vtkCurvatures* curv4 = vtkCurvatures::New();
-    curv4->SetInput(inputModel);
+    curv4->SetInputData(inputModel);
     curv4->SetCurvatureTypeToMinimum();
     curv4->Update();
     vtkPolyData* mx3 = curv4->GetOutput();
@@ -1998,9 +1998,10 @@ void runPCA(Options& opts, StringVector& args) {
     }
 
     vtkPCAAnalysisFilter* pcaFilter = vtkPCAAnalysisFilter::New();
-    pcaFilter->SetNumberOfInputs(args.size());
+    //pcaFilter->SetNumberOfInputs(args.size());
     for (unsigned int i = 0; i < args.size(); i++) {
-        pcaFilter->SetInput(i, inputs[i]);
+        //pcaFilter->SetInput(i, inputs[i]);
+        pcaFilter->AddInputDataObject(inputs[i]);
     }
     pcaFilter->Update();
     vtkFloatArray* eigenValues = pcaFilter->GetEvals();
@@ -2022,15 +2023,16 @@ void runProcrustes(Options& opts, StringVector& args) {
 
     vtkIO vio;
     vtkProcrustesAlignmentFilter* pros = vtkProcrustesAlignmentFilter::New();
-    pros->SetNumberOfInputs(nInputs);
+    //pros->SetNumberOfInputs(nInputs);
     for (int i = 0; i < nInputs; i++) {
-        pros->SetInput(i, vio.readFile(args[i]));
+        //pros->SetInput(i, vio.readFile(args[i]));
+        pros->AddInputDataObject(vio.readFile(args[i]));
     }
     pros->GetLandmarkTransform()->SetModeToSimilarity();
     pros->Update();
 
     for (unsigned int i = nInputs; i < args.size(); i++) {
-        vio.writeFile(args[i], pros->GetOutput(i-nInputs));
+        vio.writeFile(args[i], (vtkDataSet*)pros->GetOutput(i-nInputs));
     }
 
 }
@@ -2066,7 +2068,7 @@ void runConnectScalars(Options& opts, StringVector& args) {
     inputData->GetPointData()->AddArray(originalIds);
 
     vtkThreshold* threshold = vtkThreshold::New();
-    threshold->SetInput(inputData);
+    threshold->SetInputData(inputData);
     threshold->ThresholdBetween(tmin, tmax);
     threshold->Update();
 
@@ -2158,7 +2160,7 @@ void runConnectScalars(Options& opts, StringVector& args) {
 
     /// Threshold each cell with area
     vtkThreshold* areaThresholder = vtkThreshold::New();
-    areaThresholder->SetInput(connComp);
+    areaThresholder->SetInputData(connComp);
     areaThresholder->ThresholdByUpper(areaMin);
     areaThresholder->SetInputArrayToProcess(0, 0, 0, vtkDataObject::FIELD_ASSOCIATION_CELLS, "RegionArea");
     areaThresholder->Update();
@@ -2508,7 +2510,7 @@ void runDetectRidge(Options& opts, StringVector& args) {
     const int nPoints = inputData->GetNumberOfPoints();
 
     vtkPolyDataNormals* normalFilter = vtkPolyDataNormals::New();
-    normalFilter->SetInput(inputData);
+    normalFilter->SetInputData(inputData);
     normalFilter->ComputePointNormalsOn();
     normalFilter->ConsistencyOn();
     normalFilter->GetAutoOrientNormals();
