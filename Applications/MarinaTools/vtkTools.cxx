@@ -38,7 +38,8 @@ void writeMesh(vtkPolyData* mesh, string file) {
 void computeAverageMesh(string outputMesh, pi::StringVector& args) {
   int argc = args.size();
   vtkProcrustesAlignmentFilter* filter = vtkProcrustesAlignmentFilter::New();
-  filter->SetNumberOfInputs(argc);
+  //filter->SetNumberOfInputs(argc);
+  vtkSmartPointer<vtkPolyData> input0;
   for (int i = 0; i < argc; i++) {
     vtkPolyDataReader* reader = vtkPolyDataReader::New();
     cout << "Reading " << args[i] << endl;
@@ -46,14 +47,19 @@ void computeAverageMesh(string outputMesh, pi::StringVector& args) {
     reader->Update();
     vtkPolyData* vtk = reader->GetOutput();
     cout << "# points: " << vtk->GetNumberOfPoints() << endl;
-    filter->SetInput(i, vtk);
+    //filter->SetInput(i, vtk);
+    filter->AddInputDataObject(vtk);
+
+    if(i == 0){
+      input0 = vtk;
+    }
   }
   cout << "Computing mean ..." << flush;
   filter->GetLandmarkTransform()->SetModeToRigidBody();
   filter->Update();
   cout << " done" << endl;
   vtkPoints* averagePoints = filter->GetMeanPoints();
-  vtkPolyData* firstInput = vtkPolyData::SafeDownCast(filter->GetInput(0));
+  vtkPolyData* firstInput = input0;
   firstInput->SetPoints(averagePoints);
   vtkPolyDataWriter* writer = vtkPolyDataWriter::New();
   writer->SetInputData(firstInput);

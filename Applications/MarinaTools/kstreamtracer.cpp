@@ -523,7 +523,7 @@ int StreamTracer::CheckInputs(vtkAbstractInterpolatedVelocityField*& func,
         return VTK_ERROR;
     }
     const char *vecName = vectors->GetName();
-    func->SelectVectors(vecName);
+    func->SelectVectors(vtkDataObject::FIELD_ASSOCIATION_NONE, vecName);
 
     // Add all the inputs ( except source, of course ) which
     // have the appropriate vectors and compute the maximum

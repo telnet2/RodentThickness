@@ -1998,9 +1998,10 @@ void runPCA(Options& opts, StringVector& args) {
     }
 
     vtkPCAAnalysisFilter* pcaFilter = vtkPCAAnalysisFilter::New();
-    pcaFilter->SetNumberOfInputs(args.size());
+    //pcaFilter->SetNumberOfInputs(args.size());
     for (unsigned int i = 0; i < args.size(); i++) {
-        pcaFilter->SetInput(i, inputs[i]);
+        //pcaFilter->SetInput(i, inputs[i]);
+        pcaFilter->AddInputDataObject(inputs[i]);
     }
     pcaFilter->Update();
     vtkFloatArray* eigenValues = pcaFilter->GetEvals();
