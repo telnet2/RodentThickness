@@ -1,5 +1,9 @@
+if( NOT EXTERNAL_SOURCE_DIRECTORY )
+  set( EXTERNAL_SOURCE_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/ExternalSources )
+endif()
 
-# Make sure this file is included only once
+# Make sure this file is included only once by creating globally unique varibles
+# based on the name of this included file.
 get_filename_component(CMAKE_CURRENT_LIST_FILENAME ${CMAKE_CURRENT_LIST_FILE} NAME_WE)
 if(${CMAKE_CURRENT_LIST_FILENAME}_FILE_INCLUDED)
   return()
@@ -14,31 +18,52 @@ set(${CMAKE_CURRENT_LIST_FILENAME}_FILE_INCLUDED 1)
 ProjectDependancyPush(CACHED_extProjName ${extProjName})
 ProjectDependancyPush(CACHED_proj ${proj})
 
-# Include dependent projects if any
+# Make sure that the ExtProjName/IntProjName variables are unique globally
+# even if other External_${ExtProjName}.cmake files are sourced by
+# SlicerMacroCheckExternalProjectDependency
 set(extProjName VTK) #The find_package known name
-set(proj ${extProjName}) #This local name
-
-#if(${USE_SYSTEM_${extProjName}})
-# unset(${extProjName}_DIR CACHE)
-#endif()
+set(proj        VTK) #This local name
 
 
-
-# Sanity checks
-if(DEFINED ${extProjName}_DIR AND NOT EXISTS ${${extProjName}_DIR})
-  message(FATAL_ERROR "${extProjName}_DIR variable is defined but corresponds to non-existing directory")
+#Setting VTK_VERSION_MAJOR to its default value if it has not been set before
+set(VTK_VERSION_MAJOR 6 CACHE STRING "Choose the expected VTK major version to build Slicer (5 or 6).")
+# Set the possible values of VTK major version for cmake-gui
+set_property(CACHE VTK_VERSION_MAJOR PROPERTY STRINGS "5" "6")
+if(NOT "${VTK_VERSION_MAJOR}" STREQUAL "5" AND NOT "${VTK_VERSION_MAJOR}" STREQUAL "6")
+  set(VTK_VERSION_MAJOR 6 CACHE STRING "Choose the expected VTK major version to build Slicer (5 or 6)." FORCE)
+  message(WARNING "Setting VTK_VERSION_MAJOR to '6' as an invalid value was specified.")
 endif()
 
+set(USE_VTKv5 ON)
+set(USE_VTKv6 OFF)
+if(${VTK_VERSION_MAJOR} STREQUAL "6")
+  set(USE_VTKv5 OFF)
+  set(USE_VTKv6 ON)
+endif()
+
+if(USE_VTKv6)
+  set(${extProjName}_REQUIRED_VERSION "6.3.0")  #If a required version is necessary, then set this, else leave blank
+else()
+  set(${extProjName}_REQUIRED_VERSION "5.10")  #If a required version is necessary, then set this, else leave blank
+endif()
+
+# Sanity checks
+#if(DEFINED ${extProjName}_DIR AND NOT EXISTS ${${extProjName}_DIR})
+#  message(FATAL_ERROR "${extProjName}_DIR variable is defined but corresponds to non-existing directory (${${extProjName}_DIR})")
+#endif()
 
 # Set dependency list
 set(${proj}_DEPENDENCIES "")
-if (Slicer_USE_PYTHONQT)
+set(${PROJECT_NAME}_USE_PYTHONQT OFF)
+if (${PROJECT_NAME}_USE_PYTHONQT)
   list(APPEND ${proj}_DEPENDENCIES python)
 endif()
 
+# Include dependent projects if any
 SlicerMacroCheckExternalProjectDependency(${proj})
 
-if(NOT DEFINED ${extProjName}_DIR AND NOT ${USE_SYSTEM_${extProjName}})
+if(NOT ( DEFINED "USE_SYSTEM_${extProjName}" AND "${USE_SYSTEM_${extProjName}}" ) )
+  #message(STATUS "${__indent}Adding project ${proj}")
 
   # Set CMake OSX variable to pass down the external project
   set(CMAKE_OSX_EXTERNAL_PROJECT_ARGS)
@@ -46,37 +71,40 @@ if(NOT DEFINED ${extProjName}_DIR AND NOT ${USE_SYSTEM_${extProjName}})
     list(APPEND CMAKE_OSX_EXTERNAL_PROJECT_ARGS
       -DCMAKE_OSX_ARCHITECTURES=${CMAKE_OSX_ARCHITECTURES}
       -DCMAKE_OSX_SYSROOT=${CMAKE_OSX_SYSROOT}
-      -DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET})
+      -DCMAKE_OSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}
+      -DVTK_REQUIRED_OBJCXX_FLAGS:STRING="")
   endif()
 
   ### --- Project specific additions here
   set(VTK_WRAP_TCL OFF)
   set(VTK_WRAP_PYTHON OFF)
 
-
-
-
-  if (Slicer_USE_PYTHONQT)
-    set(VTK_WRAP_PYTHON OFF)
+  if (${PROJECT_NAME}_USE_PYTHONQT)
+    set(VTK_WRAP_PYTHON ON)
   endif()
 
-  set(VTK_PYTHON_ARGS)
-  if(Slicer_USE_PYTHONQT)
-    set(VTK_PYTHON_ARGS
-      -DVTK_INSTALL_PYTHON_USING_CMAKE:BOOL=ON
-      -DPYTHON_EXECUTABLE:PATH=${slicer_PYTHON_EXECUTABLE}
-      -DPYTHON_INCLUDE_DIR:PATH=${slicer_PYTHON_INCLUDE}
-      -DPYTHON_LIBRARY:FILEPATH=${slicer_PYTHON_LIBRARY}
+  set(VTK_PYTHON_ARGS
+      -DPYTHON_EXECUTABLE:PATH=${PYTHON_EXECUTABLE}
+      -DPYTHON_INCLUDE_DIR:PATH=${PYTHON_INCLUDE_DIR}
+      -DPYTHON_LIBRARIES:FILEPATH=${PYTHON_LIBRARIES}
       )
-   
+  if(${PROJECT_NAME}_USE_PYTHONQT)
+    list(APPEND VTK_PYTHON_ARGS
+      -DVTK_INSTALL_PYTHON_USING_CMAKE:BOOL=ON
+      )
   endif()
 
-
-      
   set(VTK_QT_ARGS)
-  if(${PROJECT_NAME}_USE_QT)
-    if(NOT APPLE)
+  if(${PRIMARY_PROJECT_NAME}_USE_QT)
+    if(USE_VTKv6)
       set(VTK_QT_ARGS
+        -DModule_vtkGUISupportQt:BOOL=ON
+        )
+    else()
+      set(VTK_QT_ARGS)
+    endif()
+    if(NOT APPLE)
+      list(APPEND VTK_QT_ARGS
         #-DDESIRED_QT_VERSION:STRING=4 # Unused
         -DVTK_USE_GUISUPPORT:BOOL=ON
         -DVTK_USE_QVTK_QTOPENGL:BOOL=ON
@@ -84,7 +112,7 @@ if(NOT DEFINED ${extProjName}_DIR AND NOT ${USE_SYSTEM_${extProjName}})
         -DQT_QMAKE_EXECUTABLE:FILEPATH=${QT_QMAKE_EXECUTABLE}
         )
     else()
-      set(VTK_QT_ARGS
+      list(APPEND VTK_QT_ARGS
         -DVTK_USE_CARBON:BOOL=OFF
         # Default to Cocoa, VTK/CMakeLists.txt will enable Carbon and disable cocoa if needed
         -DVTK_USE_COCOA:BOOL=ON
@@ -98,15 +126,15 @@ if(NOT DEFINED ${extProjName}_DIR AND NOT ${USE_SYSTEM_${extProjName}})
         )
     endif()
     find_package(Qt4 REQUIRED)
-  else(${PROJECT_NAME}_USE_QT)
+  else()
     set(VTK_QT_ARGS
         -DVTK_USE_GUISUPPORT:BOOL=OFF
         -DVTK_USE_QT:BOOL=OFF
         )
-  endif(${PROJECT_NAME}_USE_QT)
+  endif()
 
   # Disable Tk when Python wrapping is enabled
-  if (Slicer_USE_PYTHONQT)
+  if (${PROJECT_NAME}_USE_PYTHONQT)
     list(APPEND VTK_QT_ARGS -DVTK_USE_TK:BOOL=OFF)
   endif()
 
@@ -139,61 +167,86 @@ if(NOT DEFINED ${extProjName}_DIR AND NOT ${USE_SYSTEM_${extProjName}})
 
   set(VTK_BUILD_STEP "")
   if(UNIX)
-    configure_file(SuperBuild/VTK_build_step.cmake.in
-      ${CMAKE_CURRENT_BINARY_DIR}/VTK_build_step.cmake
+    configure_file(SuperBuild/External_VTK_build_step.cmake.in
+      ${CMAKE_CURRENT_BINARY_DIR}/External_VTK_build_step.cmake
       @ONLY)
-    set(VTK_BUILD_STEP ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/VTK_build_step.cmake)
+    set(VTK_BUILD_STEP ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/External_VTK_build_step.cmake)
   endif()
 
   set(${proj}_CMAKE_OPTIONS
+      -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_CURRENT_BINARY_DIR}/${proj}-install
+      -DBUILD_EXAMPLES:BOOL=OFF
+      -DBUILD_TESTING:BOOL=OFF
       -DVTK_USE_PARALLEL:BOOL=ON
-      -DVTK_DEBUG_LEAKS:BOOL=${Slicer_USE_VTK_DEBUG_LEAKS}
+      -DVTK_DEBUG_LEAKS:BOOL=${${PROJECT_NAME}_USE_VTK_DEBUG_LEAKS}
       -DVTK_LEGACY_REMOVE:BOOL=OFF
       -DVTK_WRAP_TCL:BOOL=${VTK_WRAP_TCL}
       #-DVTK_USE_RPATH:BOOL=ON # Unused
       ${VTK_TCL_ARGS}
       -DVTK_WRAP_PYTHON:BOOL=${VTK_WRAP_PYTHON}
-      -DVTK_INSTALL_LIB_DIR:PATH=${Slicer_INSTALL_LIB_DIR}
+      -DVTK_INSTALL_LIB_DIR:PATH=${${PROJECT_NAME}_INSTALL_LIB_DIR}
       ${VTK_PYTHON_ARGS}
       ${VTK_QT_ARGS}
       ${VTK_MAC_ARGS}
-      )
-
-
+    )
   ### --- End Project specific additions
-  set(${proj}_REPOSITORY ${git_protocol}://vtk.org/VTK.git CACHE STRING "" FORCE)
-  set(${proj}_GIT_TAG "v5.10.1" CACHE STRING "" FORCE)
+if(USE_VTKv6)
+  set(${proj}_GIT_TAG "v6.3.0")
+  set(${proj}_REPOSITORY ${git_protocol}://vtk.org/VTK.git)
+else()
+  set(${proj}_REPOSITORY ${git_protocol}://github.com/BRAINSia/VTK.git)
+  set(${proj}_GIT_TAG "FixClangFailure_VTK5.10_release")
+endif()
   ExternalProject_Add(${proj}
     GIT_REPOSITORY ${${proj}_REPOSITORY}
     GIT_TAG ${${proj}_GIT_TAG}
     SOURCE_DIR ${proj}
     BINARY_DIR ${proj}-build
-    UPDATE_COMMAND ""
+    BUILD_COMMAND ${VTK_BUILD_STEP}
+    LOG_CONFIGURE 0  # Wrap configure in script to ignore log output from dashboards
+    LOG_BUILD     0  # Wrap build in script to to ignore log output from dashboards
+    LOG_TEST      0  # Wrap test in script to to ignore log output from dashboards
+    LOG_INSTALL   0  # Wrap install in script to to ignore log output from dashboards
+    ${cmakeversion_external_update} "${cmakeversion_external_update_value}"
     CMAKE_GENERATOR ${gen}
     CMAKE_ARGS
       ${CMAKE_OSX_EXTERNAL_PROJECT_ARGS}
       ${COMMON_EXTERNAL_PROJECT_ARGS}
-      -DBUILD_EXAMPLES:BOOL=OFF
-      -DBUILD_TESTING:BOOL=OFF
       ${${proj}_CMAKE_OPTIONS}
-    INSTALL_COMMAND ""
+## We really do want to install in order to limit # of include paths INSTALL_COMMAND ""
     DEPENDS
       ${${proj}_DEPENDENCIES}
-    BUILD_COMMAND ${VTK_BUILD_STEP}
     )
-  set(${extProjName}_DIR ${CMAKE_BINARY_DIR}/${proj}-build)
+
+
+  set(VTKPatchScript ${CMAKE_CURRENT_LIST_DIR}/External_VTK_patch.cmake)
+  ExternalProject_Add_Step(${proj} VTKPatch
+    COMMENT "get rid of obsolete C/CXX flags"
+    DEPENDEES download
+    DEPENDERS configure
+    COMMAND ${CMAKE_COMMAND}
+    -DVTKSource=<SOURCE_DIR>
+    -DUSE_VTKv6=${USE_VTKv6}
+    -P ${VTKPatchScript}
+    )
+
+if(USE_VTKv6)
+  set(${extProjName}_DIR ${CMAKE_BINARY_DIR}/${proj}-install/lib/cmake/vtk-6.3)
+else()
+  set(${extProjName}_DIR ${CMAKE_BINARY_DIR}/${proj}-install/lib/vtk-5.10)
+endif()
+
 else()
   if(${USE_SYSTEM_${extProjName}})
-    find_package(${extProjName} ${VTK_VERSION_MAJOR} REQUIRED)
-    if(NOT ${extProjName}_DIR)
-      message(FATAL_ERROR "To use the system ${extProjName}, set ${extProjName}_DIR")
-    endif()
+    find_package(${extProjName} ${${extProjName}_REQUIRED_VERSION} REQUIRED)
+    message("USING the system ${extProjName}, set ${extProjName}_DIR=${${extProjName}_DIR}")
   endif()
   # The project is provided using ${extProjName}_DIR, nevertheless since other
-  # project may depend on ${extProjName}v4, let's add an 'empty' one
+  # project may depend on ${extProjName}, let's add an 'empty' one
   SlicerMacroEmptyExternalProject(${proj} "${${proj}_DEPENDENCIES}")
 endif()
 
+list(APPEND ${CMAKE_PROJECT_NAME}_SUPERBUILD_EP_VARS ${extProjName}_DIR:PATH)
+
 ProjectDependancyPop(CACHED_extProjName extProjName)
 ProjectDependancyPop(CACHED_proj proj)
-

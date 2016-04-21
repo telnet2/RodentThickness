@@ -3,9 +3,9 @@ Cortical Rodent Thickness Analysis
 Find the tool on
 
     NITRC : https://www.nitrc.org/projects/rodentthickness/
-    Github: https://github.com/mjacquem/RodentThickness 
+    Github: https://github.com/NIRALUser/RodentThickness.git 
 
-Contact : mjacquem@unc.edu
+Contact : beatriz_paniagua@unc.edu
 
 tool to measure cortical thickness of rodent brain
 
@@ -25,3 +25,5 @@ The programs use:
 
     Python2.6 or Python 2.7 with vtk installed
     Rscript
+
+
