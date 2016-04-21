@@ -15,7 +15,7 @@
 #include <fstream>
 
 #include "piOptions.h"
-
+#include "vtkSmartPointer.h"
 using namespace std;
 
 vtkPolyData* readMesh(string file) {
@@ -30,7 +30,7 @@ vtkPolyData* readMesh(string file) {
 
 void writeMesh(vtkPolyData* mesh, string file) {
   vtkPolyDataWriter* writer = vtkPolyDataWriter::New();
-  writer->SetInput(mesh);
+  writer->SetInputData(mesh);
   writer->SetFileName(file.c_str());
   writer->Update();
 }
@@ -56,7 +56,7 @@ void computeAverageMesh(string outputMesh, pi::StringVector& args) {
   vtkPolyData* firstInput = vtkPolyData::SafeDownCast(filter->GetInput(0));
   firstInput->SetPoints(averagePoints);
   vtkPolyDataWriter* writer = vtkPolyDataWriter::New();
-  writer->SetInput(firstInput);
+  writer->SetInputData(firstInput);
   writer->SetFileName(outputMesh.c_str());
   writer->Update();
   filter->Delete();
@@ -104,7 +104,7 @@ void computeTPSWarp(pi::StringVector& args, bool inputFlip) {
 
   vtkTransformPolyDataFilter* transformer = vtkTransformPolyDataFilter::New();
   transformer->SetTransform(tpsWarp);
-  transformer->SetInput(inputMesh);
+  transformer->SetInputData(inputMesh);
   transformer->Update();
 
   vtkPolyData* warpedMesh = transformer->GetOutput();

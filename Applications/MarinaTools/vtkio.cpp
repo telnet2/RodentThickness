@@ -100,19 +100,19 @@ vtkPolyData* vtkIO::readFile(std::string file) {
 void vtkIO::writeFile(std::string file, vtkDataSet *mesh) {
     if (endswith(file, ".vtp")) {
         vtkXMLPolyDataWriter* w = vtkXMLPolyDataWriter::New();
-        w->SetInput(mesh);
+        w->SetInputData(mesh);
         w->SetFileName(file.c_str());
         w->Write();
         w->Delete();
     } else if (endswith(file, ".vtk")) {
         vtkPolyDataWriter* w = vtkPolyDataWriter::New();
-        w->SetInput(mesh);
+        w->SetInputData(mesh);
         w->SetFileName(file.c_str());
         w->Write();
         w->Delete();
     } else if (endswith(file, ".vtu")) {
         vtkXMLUnstructuredGridWriter* w = vtkXMLUnstructuredGridWriter::New();
-        w->SetInput(mesh);
+        w->SetInputData(mesh);
         w->SetFileName(file.c_str());
         w->Write();
         w->Delete();
@@ -122,7 +122,7 @@ void vtkIO::writeFile(std::string file, vtkDataSet *mesh) {
 
 void vtkIO::writeXMLFile(std::string file, vtkPolyData *mesh) {
     vtkXMLPolyDataWriter* w = vtkXMLPolyDataWriter::New();
-    w->SetInput(mesh);
+    w->SetInputData(mesh);
     w->SetFileName(file.c_str());
     w->SetDataModeToAppended();
     w->EncodeAppendedDataOff();

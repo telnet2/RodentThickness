@@ -98,7 +98,7 @@ void StreamTracer::SetSourceConnection(vtkAlgorithmOutput* algOutput)
 
 void StreamTracer::SetSource(vtkDataSet *source)
 {
-    this->SetInput(1, source);
+    this->SetInputData(1, source);
 }
 
 vtkDataSet *StreamTracer::GetSource()
@@ -547,7 +547,7 @@ int StreamTracer::CheckInputs(vtkAbstractInterpolatedVelocityField*& func,
             {
                 *maxCellSize = cellSize;
             }
-            func->AddDataSet(inp);
+            ((vtkInterpolatedVelocityField*)func)->AddDataSet(inp);
             numInputs++;
         }
         iterP->GoToNextItem();
