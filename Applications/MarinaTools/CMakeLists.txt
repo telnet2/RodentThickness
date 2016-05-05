@@ -16,11 +16,11 @@ INCLUDE(${ITK_USE_FILE})
 
 GENERATECLP(MeshPointsIntensitySampling.cxx MeshPointsIntensitySampling.xml)
 ADD_EXECUTABLE(MeshPointsIntensitySampling MeshPointsIntensitySampling.cxx MeshPointsIntensitySamplingCLP.h vtkPolyDataToitkMesh.cxx vtkPolyDataToitkMesh.h vtkio.cpp vtkio.h)
-TARGET_LINK_LIBRARIES(MeshPointsIntensitySampling ${ITK_LIBRARIES} vtkFiltering vtkIO vtkGraphics)
+TARGET_LINK_LIBRARIES(MeshPointsIntensitySampling ${ITK_LIBRARIES} ${VTK_LIBRARIES})
 
 #GENERATECLP(vtkTools.cxx vtkTools.xml)
 ADD_EXECUTABLE(vtktools vtkTools.cxx piOptions.cpp)
-TARGET_LINK_LIBRARIES(vtktools vtkFiltering vtkIO vtkGraphics vtkHybrid)
+TARGET_LINK_LIBRARIES(vtktools ${VTK_LIBRARIES})
 
 
 GENERATECLP(BinaryToDist.cxx BinToDistPreprocessing.xml)
