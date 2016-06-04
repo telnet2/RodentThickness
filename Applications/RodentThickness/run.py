@@ -761,7 +761,7 @@ if (__name__ == "__main__"):
             resample_segmentations(opts,config,csvdata,outputdir)
             regenerate_segmentations(csvdata, config, outputdir)
             compute_thickness(opts, config, csvdata, outputdir, opts.ids, opts.idl, opts.idh)
-            setup_particle_tools(config, csvdata, outputdir, opts.ids)
-            run_particle_tools(config, csvdata, outputdir, opts.ids)
-            perform_analysis(opts,config,csvdata,outputdir,"initial_dense")
-            #perform_analysis(csvdata, config, outputdir, "initial_dense")
+			if opts.run_particle_tools:
+				setup_particle_tools(config, csvdata, outputdir, opts.ids)
+				run_particle_tools(config, csvdata, outputdir, opts.ids)
+            perform_analysis(opts, config, csvdata, outputdir, "initial_dense")
