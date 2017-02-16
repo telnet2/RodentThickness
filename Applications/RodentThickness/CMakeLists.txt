@@ -1,10 +1,10 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
 
 
-#FIND_PACKAGE(Qt REQUIRED)
+FIND_PACKAGE(Qt REQUIRED)
 
-#QT4_WRAP_CPP(QtProject_HEADERS_MOC GuiCSV.h)
-#QT4_WRAP_UI(UI_FILES guicsv.ui)
+QT4_WRAP_CPP(QtProject_HEADERS_MOC GuiCSV.h)
+QT4_WRAP_UI(UI_FILES guicsv.ui)
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
 #####################
@@ -12,10 +12,10 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/GuiCSV.cxx.in ${CMAKE_CURRENT_BINARY_DIR}/GuiCSV.cxx)
 ############
 SET(RTsources RodentThickness.cxx GuiCSV.h ${CMAKE_CURRENT_BINARY_DIR}/GuiCSV.cxx ScriptRunner.h ScriptRunner.cxx StatisticalpartRunner.h StatisticalpartRunner.cxx ${QtProject_HEADERS_MOC} ${UI_FILES}) # define the variable "sources" that contains the names of files
-#GENERATECLP(RTsources RodentThickness.xml)
-#ADD_EXECUTABLE(RodentThickness ${RTsources})  # add the files contained by "sources" to the project
+GENERATECLP(RTsources RodentThickness.xml)
+ADD_EXECUTABLE(RodentThickness ${RTsources})  # add the files contained by "sources" to the project
 
-#TARGET_LINK_LIBRARIES(RodentThickness ${QT_LIBRARIES} ${ITK_LIBRARIES} ${BatchMake_LIBRARIES})
+TARGET_LINK_LIBRARIES(RodentThickness ${QT_LIBRARIES} ${ITK_LIBRARIES} ${BatchMake_LIBRARIES})
 
 
 
