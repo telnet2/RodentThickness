@@ -98,7 +98,7 @@ void StreamTracer::SetSourceConnection(vtkAlgorithmOutput* algOutput)
 
 void StreamTracer::SetSource(vtkDataSet *source)
 {
-    this->SetInput(1, source);
+    this->SetInputData(1, source);
 }
 
 vtkDataSet *StreamTracer::GetSource()
@@ -523,7 +523,7 @@ int StreamTracer::CheckInputs(vtkAbstractInterpolatedVelocityField*& func,
         return VTK_ERROR;
     }
     const char *vecName = vectors->GetName();
-    func->SelectVectors(vecName);
+    func->SelectVectors(vtkDataObject::FIELD_ASSOCIATION_NONE, vecName);
 
     // Add all the inputs ( except source, of course ) which
     // have the appropriate vectors and compute the maximum
@@ -547,7 +547,7 @@ int StreamTracer::CheckInputs(vtkAbstractInterpolatedVelocityField*& func,
             {
                 *maxCellSize = cellSize;
             }
-            func->AddDataSet(inp);
+            ((vtkInterpolatedVelocityField*)func)->AddDataSet(inp);
             numInputs++;
         }
         iterP->GoToNextItem();

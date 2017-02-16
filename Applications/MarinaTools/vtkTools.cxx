@@ -15,7 +15,7 @@
 #include <fstream>
 
 #include "piOptions.h"
-
+#include "vtkSmartPointer.h"
 using namespace std;
 
 vtkPolyData* readMesh(string file) {
@@ -30,7 +30,7 @@ vtkPolyData* readMesh(string file) {
 
 void writeMesh(vtkPolyData* mesh, string file) {
   vtkPolyDataWriter* writer = vtkPolyDataWriter::New();
-  writer->SetInput(mesh);
+  writer->SetInputData(mesh);
   writer->SetFileName(file.c_str());
   writer->Update();
 }
@@ -38,7 +38,8 @@ void writeMesh(vtkPolyData* mesh, string file) {
 void computeAverageMesh(string outputMesh, pi::StringVector& args) {
   int argc = args.size();
   vtkProcrustesAlignmentFilter* filter = vtkProcrustesAlignmentFilter::New();
-  filter->SetNumberOfInputs(argc);
+  //filter->SetNumberOfInputs(argc);
+  vtkSmartPointer<vtkPolyData> input0;
   for (int i = 0; i < argc; i++) {
     vtkPolyDataReader* reader = vtkPolyDataReader::New();
     cout << "Reading " << args[i] << endl;
@@ -46,17 +47,22 @@ void computeAverageMesh(string outputMesh, pi::StringVector& args) {
     reader->Update();
     vtkPolyData* vtk = reader->GetOutput();
     cout << "# points: " << vtk->GetNumberOfPoints() << endl;
-    filter->SetInput(i, vtk);
+    //filter->SetInput(i, vtk);
+    filter->AddInputDataObject(vtk);
+
+    if(i == 0){
+      input0 = vtk;
+    }
   }
   cout << "Computing mean ..." << flush;
   filter->GetLandmarkTransform()->SetModeToRigidBody();
   filter->Update();
   cout << " done" << endl;
   vtkPoints* averagePoints = filter->GetMeanPoints();
-  vtkPolyData* firstInput = vtkPolyData::SafeDownCast(filter->GetInput(0));
+  vtkPolyData* firstInput = input0;
   firstInput->SetPoints(averagePoints);
   vtkPolyDataWriter* writer = vtkPolyDataWriter::New();
-  writer->SetInput(firstInput);
+  writer->SetInputData(firstInput);
   writer->SetFileName(outputMesh.c_str());
   writer->Update();
   filter->Delete();
@@ -104,7 +110,7 @@ void computeTPSWarp(pi::StringVector& args, bool inputFlip) {
 
   vtkTransformPolyDataFilter* transformer = vtkTransformPolyDataFilter::New();
   transformer->SetTransform(tpsWarp);
-  transformer->SetInput(inputMesh);
+  transformer->SetInputData(inputMesh);
   transformer->Update();
 
   vtkPolyData* warpedMesh = transformer->GetOutput();

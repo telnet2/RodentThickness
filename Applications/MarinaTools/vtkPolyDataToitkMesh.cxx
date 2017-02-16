@@ -60,7 +60,7 @@ vtkPolyDataToitkMesh
   for(unsigned int p =0; p < numberOfPoints; p++)
     {
 
-    vtkFloatingPointType * apoint = vtkpoints->GetPoint( p );
+    vtkFloatingPointType * apoint =(vtkFloatingPointType*) vtkpoints->GetPoint( p );
     m_itkMesh->SetPoint( p, TriangleMeshType::PointType( apoint ));
 
     // Need to convert the point to PoinType
