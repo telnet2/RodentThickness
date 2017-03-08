@@ -29,5 +29,5 @@
 #EndForEach (${subj})
 
 GetFilename(ScriptDir ${vtkPointAttributesPythonScriptPath} PATH)
-Set (cmdline ${PythonPath} ${ScriptDir} --runstats ${WorkDir}/dataset.csv ${WorkDir}/RodentThicknessConfigfile.bms ${WorkDir})
+Set (cmdline ${PythonPath} ${ScriptDir} --compute-statistics ${WorkDir}/dataset.csv ${WorkDir}/RodentThicknessConfigfile.bms ${WorkDir})
 Run (output ${cmdline})

@@ -17,9 +17,9 @@ class PythonRunner : public QObject {
         args << "--computeThickness";
         args << "--precorrespondence";
         args << "--runcorrespondence";
-        args << "--runstats";
+        args << "--compute-statistics";
         args
-        t() << __scriptPath << "--computeThickness --precorrespondence --runcoorespondence --runstats data.csv config.bms outputdir");
+        t() << __scriptPath << "--computeThickness --precorrespondence --runcoorespondence --compute-statistics data.csv config.bms outputdir");
         _script.start(__pythonPath, args);
       }
     }
