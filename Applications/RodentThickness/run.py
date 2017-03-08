@@ -706,8 +706,12 @@ if (__name__ == "__main__"):
         parser.print_help()
     else:
         csvfile = args[0]
-        outputdir = args[1]
-        #bmsfile = args[1]
+        bmsfile = args[1]
+        outputdir = args[2]
+
+	print "CSVFILE: " + csvfile
+        print "bmsfile: " + bmsfile
+	print "Outputdir: " + outputdir
 
         check_directories(outputdir)
         config = initialize_programs(opts)
@@ -761,7 +765,7 @@ if (__name__ == "__main__"):
             resample_segmentations(opts,config,csvdata,outputdir)
             regenerate_segmentations(csvdata, config, outputdir)
             compute_thickness(opts, config, csvdata, outputdir, opts.ids, opts.idl, opts.idh)
-			if opts.run_particle_tools:
-				setup_particle_tools(config, csvdata, outputdir, opts.ids)
-				run_particle_tools(config, csvdata, outputdir, opts.ids)
+            if opts.run_particle_tools:
+                 setup_particle_tools(config, csvdata, outputdir, opts.ids)
+                 run_particle_tools(config, csvdata, outputdir, opts.ids)
             perform_analysis(opts, config, csvdata, outputdir, "initial_dense")
