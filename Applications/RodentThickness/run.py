@@ -483,7 +483,7 @@ def paratospharm(opts, config, data, outputDir):
                 refid = idlist[0]
                 cmd = "{pathParaToSPHARM} {pf} {sf} --subdivLevel 50 --spharmDegree 20 " +\
                         "{workdir}/{id}.subj. --flipTemplateOn " +\
-                        "--flipTemplate %s/%s.subj.SPHARM.coef --paraOut"
+                        "--flipTemplate {workdir}/{refid}.subj.SPHARM.coef --paraOut"
             cmd = cmd.format(**locals())
             system.run_process(cmd,verbose=opts.verbose)
 
