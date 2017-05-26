@@ -527,7 +527,8 @@ def regenerate_segmentations(data, config, outputdir):
             #surfaceInput = "{workdir}/{id}.surf.vtk".format(**locals())
             surfaceLabels = "{workdir}/{id}.labels.vtp".format(**locals())
 
-            if system.is_file_newer(labelOutput, labelMap, opts.overwrite):
+            #if system.is_file_newer(labelOutput, labelMap, opts.overwrite):
+            if (not system.is_file_exist(labelOutput)):
                 cmd = "{pathKcalc} -e 'A==3?0:A' -o {labelOutput} {labelMap}"
                 cmd = cmd.format(**locals())
                 if system.run_process(cmd,verbose=True) != 0:
@@ -549,6 +550,7 @@ def regenerate_segmentations(data, config, outputdir):
         for (tag, labelmap, group) in data:
             surfaceMeshWithLabels = "{workdir}/{tag}.labels.vtp".format(**locals())
             cmd += " " + surfaceMeshWithLabels
+
         system.run_process(cmd,verbose=True)
 
     if opts.nop3 is False:
@@ -559,22 +561,30 @@ def regenerate_segmentations(data, config, outputdir):
             surfaceImage = "{workdir}/{tag}.solution.mha".format(**locals())
             boundaryMap = "{workdir}/{tag}.boundaryMap.mha".format(**locals())
 
-            if system.is_file_newer(labelOutput, voronoiImage, opts.overwrite) or \
-                    system.is_file_newer(surfaceLabels, voronoiImage, opts.overwrite):
+            # if system.is_file_newer(labelOutput, voronoiImage, opts.overwrite) or \
+            #         system.is_file_newer(surfaceLabels, voronoiImage, opts.overwrite):
+                
+
+            # if system.is_file_newer(labelOutput, voronoiImage, opts.overwrite) or \
+            #         system.is_file_newer(surfaceLabels, voronoiImage, opts.overwrite):
+
+
+            # if system.is_file_newer(voronoiImage, boundaryMap, opts.overwrite) or \
+            #         system.is_file_newer(surfaceImage, boundaryMap, opts.overwrite):
+
+            if (not system.is_file_exist(voronoiImage,opts.overwrite)):
                 cmd = "{pathKmesh} -voronoiImage -zrotate -scalarName meanLabels " +\
                     "{labelOutput} {surfaceLabels} -o {voronoiImage}"
                 cmd = cmd.format(**locals())
                 system.run_process(cmd,verbose=True)
 
-            if system.is_file_newer(labelOutput, voronoiImage, opts.overwrite) or \
-                    system.is_file_newer(surfaceLabels, voronoiImage, opts.overwrite):
+            if (not system.is_file_exist(surfaceImage,opts.overwrite)):
                 cmd = "{pathKmesh} -scanConversion -zrotate " +\
                     "{surfaceLabels} {labelOutput} {surfaceImage}"
                 cmd = cmd.format(**locals())
                 system.run_process(cmd,verbose=True)
 
-            if system.is_file_newer(voronoiImage, boundaryMap, opts.overwrite) or \
-                    system.is_file_newer(surfaceImage, boundaryMap, opts.overwrite):
+            if (not system.is_file_exist(boundaryMap,opts.overwrite)):
                 cmd = "{pathKcalc} -e 'B>0?3:A' -o {boundaryMap} " +\
                     "{voronoiImage} {surfaceImage}"
                 cmd = cmd.format(**locals())
