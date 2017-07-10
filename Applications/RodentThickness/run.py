@@ -634,13 +634,19 @@ def run_particle_tools(config, data, outputdir, ids):
 
     # generate binary distance map for each label map
     # cmd = "%s %s %s/inputimage.txt %s/inputsurfacemodels.txt -c %s/outputCorrespondence.txt -w %s/outputWarped.txt --workingDir %s --pathShapeWorksRun %s --pathShapeWorksGroom %s --pathImageMath %s --pathBinaryToDistanceMap %s" % (pathPython, pathShapeWorksScript, workdir, workdir, workdir, workdir, workdir, pathShapeWorksRun, pathShapeWorksGroom, pathImageMath, pathBinaryToDistanceMap)
-    cmd = "{pathPython} {pathShapeWorksScript} {workdir}/inputimage.txt " +\
-            "{workdir}/inputsurfacemodels.txt " + \
-            "-c {workdir}/outputCorrespondence.txt " +\
-            "-w {workdir}/outputWarped.txt " +\
-            "--workingDir {workdir}"     
-    cmd = cmd.format(**locals())         
-    system.run_process(cmd,verbose=True)
+
+    outputCorrespondence = "{workdir}/outputCorrespondence.txt"
+    outputCorrespondence = outputCorrespondence.format(**locals())  
+    if (not system.is_file_exist(outputCorrespondence,opts.overwrite)):
+
+        cmd = "{pathPython} {pathShapeWorksScript} {workdir}/inputimage.txt " +\
+                "{workdir}/inputsurfacemodels.txt " + \
+                "-c {workdir}/outputCorrespondence.txt " +\
+                "-w {workdir}/outputWarped.txt " +\
+                "--workingDir {workdir}" 
+            
+        cmd = cmd.format(**locals())         
+        system.run_process(cmd,verbose=True)
 
 
 def performSplit(args, outputPattern):
