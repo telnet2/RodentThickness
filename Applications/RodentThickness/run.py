@@ -382,7 +382,7 @@ def labelprocessing(config, csvdata, outputdir, labelNCleft, labelNCright, label
 
 # run thickness measurement
 # if the measurement file exists, skip it
-def compute_thickness(opts, config, data, outputdir, ids, idl, idh):
+def compute_thickness(opts, config, data, outputdir, ids, idl, idh, idn):
     pathThicknessTool = config["measureThicknessFilterPath"]
     for (id, labelmap, group) in data:
         labelmap = "{outputdir}/Processing/1.MeasurementandSPHARM/{id}.boundaryMap.mha".format(**locals())
@@ -400,7 +400,7 @@ def compute_thickness(opts, config, data, outputdir, ids, idl, idh):
 
         if system.is_file_newer(measurementoutput, labelmap, opts.overwrite) or \
                 system.is_file_newer(measurementoutput, "{workdir}/laplacianCache.nii.gz".format(**locals()), opts.overwrite):
-            cmd = "{pathThicknessTool} --mr --sbt --ids {ids} --idl {idl} --idh {idh} --ttrns 500 " +\
+            cmd = "{pathThicknessTool} --mr --sbt --ids {ids} --idl {idl} --idh {idh} --idn {idn} --ttrns 500 " +\
                 "--workdir {workdir} --cachedLaplacianOutput laplacianCache.nii.gz {labelmap} {measurementoutput}"
             cmd = cmd.format(**locals())
             system.run_process(cmd,verbose=True)
@@ -573,7 +573,7 @@ def regenerate_segmentations(data, config, outputdir):
             #         system.is_file_newer(surfaceImage, boundaryMap, opts.overwrite):
 
             if (not system.is_file_exist(voronoiImage,opts.overwrite)):
-                cmd = "{pathKmesh} -voronoiImage -zrotate -scalarName meanLabels " +\
+                cmd = "{pathKmesh} -voronoiImage -zrotate -scalarName labels " +\
                     "{labelOutput} {surfaceLabels} -o {voronoiImage}"
                 cmd = cmd.format(**locals())
                 system.run_process(cmd,verbose=True)
@@ -694,6 +694,7 @@ if (__name__ == "__main__"):
     parser.add_option("--run-preprocessing", help="generate surface meshes and regenerate consistent labelmaps", action="store_true", dest="run_preprocessing")
     parser.add_option("--run-all", help="run all pipeline steps", action="store_true", dest="run_all")
 
+    parser.add_option("--idn", metavar="6", help="Neumann Boundary label", dest="idn", default="6")
     parser.add_option("--ids", metavar="3", help="solution label", dest="ids", default="3")
     parser.add_option("--idl", metavar="2", help="low boundary label", dest="idl", default="2")
     parser.add_option("--idh", metavar="1", help="high boundary label", dest="idh", default="1")
@@ -754,7 +755,7 @@ if (__name__ == "__main__"):
             regenerate_segmentations(csvdata, config, outputdir)
 
         if (opts.compute_thickness):
-            compute_thickness(opts, config, csvdata, outputdir, opts.ids, opts.idl, opts.idh)
+            compute_thickness(opts, config, csvdata, outputdir, opts.ids, opts.idl, opts.idh, opts.idn)
 
         if (opts.run_particle_tools):
             setup_particle_tools(config, csvdata, outputdir, opts.ids)
@@ -780,7 +781,7 @@ if (__name__ == "__main__"):
             paratospharm(opts, config, csvdata, outputdir)
             resample_segmentations(opts,config,csvdata,outputdir)
             regenerate_segmentations(csvdata, config, outputdir)
-            compute_thickness(opts, config, csvdata, outputdir, opts.ids, opts.idl, opts.idh)
+            compute_thickness(opts, config, csvdata, outputdir, opts.ids, opts.idl, opts.idh, opts.idn)
             if opts.run_particle_tools:
                  setup_particle_tools(config, csvdata, outputdir, opts.ids)
                  run_particle_tools(config, csvdata, outputdir, opts.ids)
