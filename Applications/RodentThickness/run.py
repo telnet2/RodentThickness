@@ -1,4 +1,4 @@
-#!@pathexecpython@
+#!/usr/bin/python
 
 '''
 This python script accepts .csv data set, .bms configurations, and output directory then produces statistical analysis results from the processed data
@@ -65,13 +65,17 @@ def initialize_programs(opts):
     return system.configure_paths(newpath, programs_list, opts.verbose)
    
 
-def initalize_dataset(csvfile):
+# id,label file,group
+def initialize_dataset(csvfile):
     csvreader = csv.reader(open(csvfile, "r"))
     csvheader = csvreader.next()
 
     csvdata = []
     for csvline in csvreader:
+        print csvline
         csvdata.append(csvline)
+    if len(csvdata) == 0:
+        raise RuntimeError("No records in CSV file: %s\nPlease check if the header line is included." % csvfile)
     return csvdata
 
 
@@ -135,6 +139,8 @@ def sample_thickness(opts,config,csvdata,outputDir,corr_opt):
     else:
         extra_args = ""
 
+    print csvdata
+
     # depending on options, choose different meshes
     # loop over ids
     for id in [i for i,l,g in csvdata]:
@@ -146,7 +152,7 @@ def sample_thickness(opts,config,csvdata,outputDir,corr_opt):
             smoothSamplingTxt = "%s/%s.smoothInitialDenseSampling.txt" % (sampleDir, id)
             samplingMeshOutput = "%s/%s.initialDenseSampling.vtk" % (sampleDir, id)
             originalMeshOutput = "%s/%s.initialDenseOriginal.vtk" % (sampleDir, id)
-            inputMesh = "%s/%s.subj.SPHARM.vtk" % (meshDir, id)
+            inputMesh = "%s/%s.subj._SPHARM.vtk" % (meshDir, id)
         elif (corr_opt == "correspondence"):
             samplingTxt = "%s/%s.sampling.txt" % (sampleDir, id)
             smoothSamplingTxt = "%s/%s.smoothSampling.txt" % (sampleDir, id)
@@ -164,7 +170,7 @@ def sample_thickness(opts,config,csvdata,outputDir,corr_opt):
             smoothSamplingTxt = "%s/%s.smoothSpharmSampling.txt" % (sampleDir, id)
             samplingMeshOutput = "%s/%s.spharmSampling.vtk" % (sampleDir, id)
             originalMeshOutput = "%s/%s.spharmOriginal.vtk" % (sampleDir, id)
-            inputMesh = "%s/%s.subj.SPHARM.vtk" % (meshDir, id)
+            inputMesh = "%s/%s.subj._SPHARM.vtk" % (meshDir, id)
 
 
         #samplingCmd = "{MeshPointIntensitySamplingPath} --workDir {workdir} --inputAsPhysicalCoord {extra_args} --distanceVector {distanceVector} -i nn -a {samplingTxt} -m {samplingMeshOutput} --smoothedAttributeOutput {smoothSamplingTxt} --originalMeshOutput {originalMeshOutput} {inputMeasurement} {inputMesh}"
@@ -175,8 +181,7 @@ def sample_thickness(opts,config,csvdata,outputDir,corr_opt):
         if system.is_file_newer(smoothSamplingTxt, inputMeasurement, opts.overwrite) or \
                 system.is_file_newer(smoothSamplingTxt, samplingTxt, opts.overwrite) or \
                 system.is_file_newer(smoothSamplingTxt, samplingMeshOutput, opts.overwrite):
-            useStreamLine = corr_opt == "spharm_sampling"
-            if (not useStreamLine):
+            if (not opts.useStreamLine):
                 exeCmd = "{pathKmesh} -sampleImage {inputMeasurement} {inputMesh} {samplingMeshOutput} " +\
                             "-outputScalarName Thickness -zrotate"
                 exeCmd = exeCmd.format(**locals())
@@ -294,7 +299,7 @@ def perform_analysis(opts, config, csvdata, outputDir, corr_opt="initial_dense")
     if (corr_opt == "initial_dense"):
         outputfile = "%s/stats.initialDenseSampling.txt" % statDir
         outputVTK = "%s/stats.initialDenseSampling.vtk" % (statDir)
-        inputVTK = "%s/%s.subj.SPHARM.vtk" % (meshDir, ids[0])
+        inputVTK = "%s/%s.subj._SPHARM.vtk" % (meshDir, ids[0])
     elif (corr_opt == "correspondence"):
         outputfile = "%s/stats.correspondence.txt" % statDir
         outputVTK = "%s/stats.correspondence.vtk" % (statDir)
@@ -306,7 +311,7 @@ def perform_analysis(opts, config, csvdata, outputDir, corr_opt="initial_dense")
     elif (corr_opt == "spharm_sampling"):
         outputfile = "%s/stats.spharmCorrespondence.txt" % statDir
         outputVTK = "%s/stats.spharmCorrespondence.vtk" % (statDir)
-        inputVTK = "%s/%s.subj.SPHARM.vtk" % (meshDir, ids[0])
+        inputVTK = "%s/%s.subj._SPHARM.vtk" % (meshDir, ids[0])
 
     #pythonScriptPath = config["vtkPointAttributesPythonScriptPath"]
 
@@ -413,6 +418,7 @@ def genparamesh(opts, config, data, outputDir):
     pathImageMath = config["ImageMathPath"]
     pathSegPostProcess = config["SegPostProcessCLPPath"]
     workdir = "{outputDir}/Processing/1.MeasurementandSPHARM".format(**locals())
+    print data, pathGenParaMesh, pathImageMath, workdir
 
     for (id, labelmap, group) in data:
         eulerName = "{workdir}/{id}.euler.txt".format(**locals())
@@ -448,8 +454,8 @@ def paratospharm(opts, config, data, outputDir):
     idlist = [id for id,l,g in data]
     parafiles = ["%s/%s.para.vtk"%(workdir,id) for id,l,g in data]
     surffiles = ["%s/%s.surf.vtk"%(workdir,id) for id,l,g in data]
-    lowresfiles = ["%s/%s.ip.SPHARM.vtk"%(workdir,id) for id,l,g in data]
-    highresfiles = ["%s/%s.subj.SPHARM.vtk"%(workdir,id) for id,l,g in data]
+    lowresfiles = ["%s/%s.ip._SPHARM.vtk"%(workdir,id) for id,l,g in data]
+    highresfiles = ["%s/%s.subj._SPHARM.vtk"%(workdir,id) for id,l,g in data]
     lowresparams = ["%s/%s.ip.Param.vtk"%(workdir,id) for id,l,g in data]
     highresparams = ["%s/%s.subj.Param.vtk"%(workdir,id) for id,l,g in data]
     dataset = zip(parafiles, surffiles, lowresfiles, lowresparams, highresfiles, highresparams)
@@ -515,15 +521,17 @@ def regenerate_segmentations(data, config, outputdir):
     if testLabelMapsFail:
         raise RuntimeError("There are missing label maps")
 
-    surfaceInputList = ["{workdir}/{id}.subj.SPHARM.vtk".format(**locals()) for (id,l,g) in data]
+    surfaceInputList = ["{workdir}/{id}.subj._SPHARM.vtk".format(**locals()) for (id,l,g) in data]
     testSurfaceInputsFail = False in [os.path.exists(x) for x in surfaceInputList]
     if testSurfaceInputsFail:
+        print surfaceInputList
+        print testSurfaceInputsFail
         raise RuntimeError("There are missing surface inputs. Check SPHARM results!")
 
     if opts.nop1 is False:
         for idx, (id,labelMap,group) in enumerate(data):
             labelOutput = "{workdir}/{id}.zerocortex.nrrd".format(**locals())
-            surfaceInput = "{workdir}/{id}.subj.SPHARM.vtk".format(**locals())
+            surfaceInput = "{workdir}/{id}.subj._SPHARM.vtk".format(**locals())
             #surfaceInput = "{workdir}/{id}.surf.vtk".format(**locals())
             surfaceLabels = "{workdir}/{id}.labels.vtp".format(**locals())
 
@@ -602,8 +610,8 @@ def setup_particle_tools(config, data, outputDir, ids):
         "{outputDir}/Processing/2.shapeworks/outputWarped.txt".format(**locals()), 'w')
 
     workdir = "{outputDir}/Processing/1.MeasurementandSPHARM".format(**locals())
-    lowresfiles = ["{workdir}/{id}.ip.SPHARM.vtk".format(**locals()) for id,l,g in data]
-    highresfiles = ["{workdir}/{id}.subj.SPHARM.vtk".format(**locals()) for id,l,g in data]
+    lowresfiles = ["{workdir}/{id}.ip._SPHARM.vtk".format(**locals()) for id,l,g in data]
+    highresfiles = ["{workdir}/{id}.subj._SPHARM.vtk".format(**locals()) for id,l,g in data]
     segmentationfiles = ["{workdir}/{id}.segpost.nii.gz".format(**locals()) for id,l,g in data]
     shapedir = "{outputDir}/Processing/2.shapeworks".format(**locals())
     correspondencefiles = ["{shapedir}/{id}.correspondence.vtk".format(**locals()) for id,l,g in data]
@@ -703,6 +711,7 @@ if (__name__ == "__main__"):
     parser.add_option("--labelNCright", help="label id for NC right", dest="labelNCright", default="14")
     parser.add_option("--labelOB", help="label id for Olfactory Bulb", dest="labelOB", default="16")
 
+    parser.add_option("--useStreamLine", help="Use streamline processing when computing thickness", dest="useStreamLine", action="store_true")
     parser.add_option("--regionSplit", help="split the data file with its region (1st column)", dest="regionSplit", action="store_true")
     parser.add_option("--outputPattern", help="Specify the output pattern ex) --outputPattern region_control_%02d.txt", dest="outputPattern")
     parser.add_option("--overwrite", help="specify if the script overwrites previous results", action="store_true", dest="overwrite", default=False)
@@ -726,13 +735,14 @@ if (__name__ == "__main__"):
         bmsfile = args[1]
         outputdir = args[2]
 
-	print "CSVFILE: " + csvfile
+        print "CSVFILE: " + csvfile
         print "bmsfile: " + bmsfile
-	print "Outputdir: " + outputdir
+        print "Outputdir: " + outputdir
 
         check_directories(outputdir)
         config = initialize_programs(opts)
-        csvdata = initalize_dataset(csvfile)
+        csvdata = initialize_dataset(csvfile)
+       
         initialize_system_logging(opts)
 
 
